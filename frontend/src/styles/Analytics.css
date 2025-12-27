@@ -1,0 +1,100 @@
+.analytics-page {
+  padding: 2rem;
+  background-color: #f9f9f9;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.analytics-header h1 {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 0.25rem;
+}
+
+.analytics-header p {
+  font-size: 0.9rem;
+  color: #555;
+  margin-bottom: 1.5rem;
+}
+
+/* Time range buttons */
+.time-range {
+  margin-bottom: 1.5rem;
+}
+
+.time-range button {
+  margin-right: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 0.25rem;
+  background-color: #e5e7eb;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.time-range button.active,
+.time-range button:hover {
+  background-color: #2563eb;
+  color: white;
+}
+
+/* Stats cards */
+.stats-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.card {
+  background: white;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.card-icon {
+  margin-right: 1rem;
+  color: #2563eb;
+}
+
+.card-info h2 {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.card-info p {
+  margin: 0;
+  color: #555;
+}
+
+/* Chart placeholders */
+.charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.chart-placeholder {
+  background: white;
+  padding: 2rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  text-align: center;
+  font-size: 1rem;
+  color: #888;
+  min-height: 200px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .stats-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .charts {
+    grid-template-columns: 1fr;
+  }
+}

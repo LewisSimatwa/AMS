@@ -1,0 +1,303 @@
+/* Sidebar Container */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 280px; /* full expanded width */
+  background-color: #1e3a8a; /* dark blue */
+  color: #e5e5e5; /* text color */
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  overflow: hidden;
+  border-right: 1px solid #3b82f6; /* light blue border */
+  transform: translateX(-100%); /* hidden by default */
+  transition: transform 0.3s ease;
+}
+
+/* Expanded / Open state */
+.sidebar.open {
+  transform: translateX(0);
+}
+
+/* Burger Button (always visible) */
+.burger-btn {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1100;
+  width: 2.5rem;
+  height: 2.5rem;
+  background-color: transparent;
+  border: 1px solid #3b82f6;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e5e5e5;
+  transition: all 0.2s;
+}
+
+.burger-btn:hover {
+  background-color: #2563eb; /* hover darker blue */
+  border-color: #60a5fa; /* lighter hover border */
+}
+
+/* Header */
+.sidebar-header {
+  padding: 1.25rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 60px;
+}
+
+.logo-icon {
+  font-size: 1.75rem;
+  min-width: 2.5rem;
+  text-align: center;
+}
+
+.logo-text {
+  font-size: 1.5rem;
+  font-weight: 400;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar.open .logo-text {
+  opacity: 1;
+}
+
+/* New Chat Button */
+.new-chat-btn {
+  margin: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background-color: #2563eb; /* bright blue button */
+  border: none;
+  border-radius: 0.5rem;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+  font-weight: 500;
+  justify-content: center;
+}
+
+.sidebar.open .new-chat-btn {
+  justify-content: flex-start;
+}
+
+.new-chat-btn:hover {
+  background-color: #1d4ed8; /* darker blue on hover */
+}
+
+.new-chat-icon {
+  font-size: 1.5rem;
+  min-width: 1.5rem;
+  text-align: center;
+}
+
+.new-chat-label {
+  opacity: 0;
+  white-space: nowrap;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar.open .new-chat-label {
+  opacity: 1;
+}
+
+/* Navigation */
+.sidebar-nav {
+  flex: 1;
+  padding: 1rem 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.nav-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  margin: 0.125rem 0.5rem;
+  border-radius: 0.5rem;
+  background: none;
+  border: none;
+  color: #b5b5b5;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: calc(100% - 1rem);
+  justify-content: center;
+  position: relative;
+}
+
+.sidebar.open .nav-item {
+  justify-content: flex-start;
+}
+
+.nav-item:hover,
+.nav-item.active {
+  background-color: #1e40af; /* slightly darker blue */
+  color: #ffffff;
+}
+
+.nav-icon {
+  font-size: 1.25rem;
+  min-width: 1.5rem;
+  text-align: center;
+}
+
+.nav-label {
+  opacity: 0;
+  white-space: nowrap;
+  transition: opacity 0.3s ease;
+  font-size: 0.95rem;
+}
+
+.sidebar.open .nav-label {
+  opacity: 1;
+}
+
+/* Footer */
+.sidebar-footer {
+  padding: 1rem 0.75rem;
+  border-top: 1px solid #3b82f6; /* light blue border */
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background-color: transparent;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  justify-content: center;
+}
+
+.sidebar.open .user-profile {
+  justify-content: flex-start;
+}
+
+.user-profile:hover {
+  background-color: #1e40af;
+}
+
+.user-avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  min-width: 2.5rem;
+  border-radius: 50%;
+  background-color: #60a5fa; /* light blue for avatar */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #1e3a8a;
+}
+
+.user-info {
+  min-width: 0;
+  flex: 1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar.open .user-info {
+  opacity: 1;
+}
+
+.user-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #e5e5e5;
+}
+
+.user-role {
+  font-size: 0.75rem;
+  color: #a5b4fc; /* lighter blue for role text */
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #ef4444; /* red logout button */
+  border: none;
+  border-radius: 0.5rem;
+  color: white;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  margin-top: 0.5rem;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar.open .logout-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.logout-btn:hover {
+  background-color: #b91c1c;
+}
+
+/* Scrollbar styling */
+.sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: #2563eb; /* blue scrollbar */
+  border-radius: 3px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: #1d4ed8;
+}
+
+/* Mobile overlay */
+.sidebar-overlay {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 280px;
+  }
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1050;
+  }
+}

@@ -1,0 +1,27 @@
+/* App Layout Container */
+.app-layout {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  background-color: #f9fafb;
+  overflow-x: hidden;
+}
+
+/* Main Content Area */
+.main-content {
+  min-height: 100vh;
+  width: 100%;
+  padding: 1rem; /* optional spacing */
+  overflow-x: auto;
+  overflow-y: auto;
+  background-color: #f9fafb;
+  transition: margin-left 0.3s ease, width 0.3s ease;
+}
+
+/* Shift content when sidebar is open (desktop only) */
+@media (min-width: 769px) {
+  .main-content.shifted {
+    margin-left: 280px;             /* same as sidebar width */
+    width: calc(100% - 280px);      /* prevent overflow */
+  }
+}

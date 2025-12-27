@@ -1,0 +1,344 @@
+/* Container */
+.select-institution-container {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f9fafb;
+  padding: 1.5rem;
+  overflow: hidden;
+}
+
+.content-wrapper {
+  background: white;
+  border-radius: 1.5rem;
+  padding: 3rem;
+  width: 100%;
+  height: 90vh;
+  max-width: 60rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+  animation: slideUp 0.6s ease-out;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Loading State */
+.loading-container {
+  text-align: center;
+  color: #374151;
+}
+
+.loading-icon {
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+  color: #2563eb;
+}
+
+.loading-text {
+  font-size: 1.125rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* Error State */
+.error-container {
+  background: white;
+  border-radius: 1.5rem;
+  padding: 3rem;
+  text-align: center;
+  max-width: 28rem;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.error-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.error-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 0.5rem 0;
+}
+
+.error-message {
+  color: #dc2626;
+  margin: 0 0 1.5rem 0;
+}
+
+.retry-button {
+  background: linear-gradient(to right, #2563eb, #1d4ed8);
+  color: white;
+  padding: 0.75rem 2rem;
+  border-radius: 0.75rem;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retry-button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.3);
+}
+
+/* Header Section */
+.header-section {
+  text-align: center;
+  margin-bottom: 2rem;
+  flex-shrink: 0;
+}
+
+.logo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  border-radius: 1rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.4);
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 0.5rem 0;
+}
+
+.page-subtitle {
+  font-size: 1rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Institutions Grid */
+.institutions-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .institutions-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Institution Card */
+.institution-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.institution-card:hover {
+  border-color: #2563eb;
+  box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.2);
+  transform: translateY(-2px);
+}
+
+.institution-card.selected {
+  border-color: #2563eb;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.05) 0%, rgba(29, 78, 216, 0.05) 100%);
+  box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.3);
+}
+
+.institution-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  border-radius: 0.75rem;
+  flex-shrink: 0;
+}
+
+.institution-card.selected .institution-icon {
+  box-shadow: 0 5px 15px -3px rgba(37, 99, 235, 0.5);
+}
+
+.institution-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.institution-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 0.25rem 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.institution-location {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check-icon {
+  color: #2563eb;
+  flex-shrink: 0;
+  animation: scaleIn 0.3s ease-out;
+}
+
+/* Continue Button */
+.continue-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: linear-gradient(to right, #2563eb, #1d4ed8);
+  color: white;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  border: none;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.4);
+  flex-shrink: 0;
+}
+
+.continue-button:hover:not(:disabled) {
+  transform: scale(1.02);
+  box-shadow: 0 15px 30px -5px rgba(37, 99, 235, 0.5);
+}
+
+.continue-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.continue-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.button-arrow {
+  transition: transform 0.2s ease;
+}
+
+.continue-button:hover:not(:disabled) .button-arrow {
+  transform: translateX(0.25rem);
+}
+
+.button-spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* Helper Text */
+.helper-text {
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin: 1rem 0 0 0;
+  flex-shrink: 0;
+}
+
+/* Animations */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .content-wrapper {
+    padding: 2rem;
+  }
+
+  .page-title {
+    font-size: 1.75rem;
+  }
+
+  .institutions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .institution-card {
+    padding: 1rem;
+  }
+
+  .institution-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .institution-name {
+    font-size: 1rem;
+  }
+}
+
+/* Scrollbar Styling for institutions grid only */
+.institutions-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.institutions-grid::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.institutions-grid::-webkit-scrollbar-thumb {
+  background: #2563eb;
+  border-radius: 10px;
+}
+
+.institutions-grid::-webkit-scrollbar-thumb:hover {
+  background: #1d4ed8;
+}
