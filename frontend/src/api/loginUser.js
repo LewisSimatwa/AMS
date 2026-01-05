@@ -25,3 +25,4 @@ export async function loginUser(email, password, institutionId) {
     throw new Error(error.message || "Failed to login");
   }
 }
+

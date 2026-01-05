@@ -22,8 +22,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!token || !institutionId) {
-      navigate("/login");
-      return;
+      //navigate("/login");
+      //return;
     }
 
     fetchDashboardData();

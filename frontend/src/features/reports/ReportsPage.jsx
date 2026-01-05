@@ -33,20 +33,42 @@ export default function Reports() {
     try {
       const headers = {
         Authorization: `Bearer ${token}`,
-        "X-Institution-ID": institutionId,
+        "Content-Type": "application/json",
       };
 
       const response = await fetch(
-        `http://localhost:8000/api/audit/logs?institution_id=${institutionId}`,
+        `http://localhost:8000/audit_logs.php`,
         { headers }
       );
 
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error("Non-JSON response:", text);
+        throw new Error("Server returned non-JSON response.");
+      }
+
       if (!response.ok) {
-        throw new Error("Failed to fetch audit logs");
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP error ${response.status}`);
       }
 
       const data = await response.json();
-      setAuditLogs(data.logs || []);
+
+      const mappedLogs = (data.logs || []).map(log => ({
+        id: log.id,
+        action: log.action,
+        details: formatLogDetails(log),
+        username: log.performed_by || "System",
+        created_at: log.timestamp,
+        entity_type: log.entity_type,
+        entity_id: log.entity_id,
+        old_value: log.old_value,
+        new_value: log.new_value,
+        institution_name: log.institution_name
+      }));
+
+      setAuditLogs(mappedLogs);
     } catch (err) {
       console.error("Fetch audit logs error:", err);
       setError(err.message || "Failed to load audit logs");
@@ -55,61 +77,90 @@ export default function Reports() {
     }
   }
 
-  function handleFilterChange(e) {
-    const { name, value } = e.target;
-    setFilters((prev) => ({ ...prev, [name]: value }));
+  function formatLogDetails(log) {
+    const parts = [];
+
+    if (log.entity_type && log.entity_id) {
+      parts.push(`${log.entity_type} #${log.entity_id}`);
+    }
+
+    if (log.old_value || log.new_value) {
+      try {
+        const oldVal = log.old_value ? JSON.parse(log.old_value) : null;
+        const newVal = log.new_value ? JSON.parse(log.new_value) : null;
+
+        if (oldVal && newVal) {
+          const changes = Object.keys(newVal)
+            .filter(key => oldVal[key] !== newVal[key])
+            .map(key => `${key}: ${oldVal[key]} → ${newVal[key]}`)
+            .join(", ");
+
+          if (changes) parts.push(changes);
+        } else if (newVal) {
+          parts.push(JSON.stringify(newVal));
+        }
+      } catch {
+        if (log.old_value && log.new_value) {
+          parts.push(`${log.old_value} → ${log.new_value}`);
+        } else if (log.new_value) {
+          parts.push(log.new_value);
+        }
+      }
+    }
+
+    return parts.join(" | ") || "—";
   }
 
-  // Filter audit logs
-  const filteredLogs = auditLogs.filter((log) => {
+  function handleFilterChange(e) {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
+  }
+
+  const filteredLogs = auditLogs.filter(log => {
     const logDate = new Date(log.created_at);
     const startDate = filters.startDate ? new Date(filters.startDate) : null;
     const endDate = filters.endDate ? new Date(filters.endDate) : null;
 
-    const statusMatch = filters.status === "All" || 
-      (filters.status === "Movement" && log.action === "Asset Movement") ||
-      (filters.status === "Status" && log.action === "Status Change");
+    const statusMatch =
+      filters.status === "All" ||
+      (filters.status === "Movement" && log.action.toLowerCase().includes("move")) ||
+      (filters.status === "Status" && log.action.toLowerCase().includes("status"));
 
-    const dateMatch = 
+    const dateMatch =
       (!startDate || logDate >= startDate) &&
       (!endDate || logDate <= endDate);
 
     return statusMatch && dateMatch;
   });
 
-  async function generateReport() {
+  /* ============================
+     ✅ FIXED PDF GENERATION
+     ============================ */
+  function generateReport() {
     setGenerating(true);
 
-    try {
-      const headers = {
-        Authorization: `Bearer ${token}`,
-        "X-Institution-ID": institutionId,
-      };
-
-      const response = await fetch(
-        `http://localhost:8000/api/reports/generate?institution_id=${institutionId}`,
-        { headers }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to generate report");
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `asset_report_${new Date().toISOString().split("T")[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (err) {
-      console.error("Generate report error:", err);
-      alert(err.message || "Failed to generate report");
-    } finally {
+    if (!token) {
+      alert("Authentication required");
       setGenerating(false);
+      return;
     }
+
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = "http://localhost:8000/generate_report.php";
+    form.target = "_blank";
+
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "token";
+    input.value = token;
+
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+
+    setGenerating(false);
   }
 
   if (loading) {
@@ -127,8 +178,8 @@ export default function Reports() {
           <h1>Reports & Audit Logs</h1>
           <p>View activity logs and generate reports</p>
         </div>
-        <button 
-          className="generate-btn" 
+        <button
+          className="generate-btn"
           onClick={generateReport}
           disabled={generating}
         >
@@ -143,7 +194,6 @@ export default function Reports() {
         </div>
       )}
 
-      {/* Filters */}
       <div className="reports-filters">
         <select name="status" value={filters.status} onChange={handleFilterChange}>
           <option value="All">All Activities</option>
@@ -151,28 +201,14 @@ export default function Reports() {
           <option value="Status">Status Changes</option>
         </select>
 
-        <input
-          type="date"
-          name="startDate"
-          value={filters.startDate}
-          onChange={handleFilterChange}
-          placeholder="Start Date"
-        />
-
-        <input
-          type="date"
-          name="endDate"
-          value={filters.endDate}
-          onChange={handleFilterChange}
-          placeholder="End Date"
-        />
+        <input type="date" name="startDate" value={filters.startDate} onChange={handleFilterChange} />
+        <input type="date" name="endDate" value={filters.endDate} onChange={handleFilterChange} />
 
         <button onClick={fetchAuditLogs} className="refresh-btn">
           Refresh
         </button>
       </div>
 
-      {/* Audit Logs Table */}
       <div className="reports-summary">
         <p>
           Showing <strong>{filteredLogs.length}</strong> of{" "}
@@ -197,13 +233,11 @@ export default function Reports() {
               </td>
             </tr>
           ) : (
-            filteredLogs.map((log) => (
+            filteredLogs.map(log => (
               <tr key={log.id}>
-                <td>
-                  <span className="action-badge">{log.action}</span>
-                </td>
-                <td>{log.details || "—"}</td>
-                <td>{log.username || "System"}</td>
+                <td><span className="action-badge">{log.action}</span></td>
+                <td>{log.details}</td>
+                <td>{log.username}</td>
                 <td>{new Date(log.created_at).toLocaleString()}</td>
               </tr>
             ))

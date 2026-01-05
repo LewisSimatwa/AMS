@@ -8,7 +8,7 @@ export default function Login() {
   const [form, setForm] = useState({ 
     email: "", 
     password: "",
-    institution_id: "1"  // Default to institution 1
+    institution_id: "" 
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -33,7 +33,7 @@ export default function Login() {
       const institutionId = parseInt(form.institution_id, 10);
 
       // Call login API with email, password, and institution_id
-      const response = await loginUser(form.email, form.password, institutionId);
+      const response = await loginUser(form.email, form.password, parseInt(form.institution_id, 10));
       
       // Store data in localStorage
       localStorage.setItem("token", response.token);
@@ -60,7 +60,7 @@ export default function Login() {
           <div className="logo-wrapper">
             <div className="logo-glow"></div>
             <div className="logo-container">
-              <img src="frontend/public/miams_logo.svg" alt="MIAMS Logo" className="logo-image" />
+              <img src="dist\miams_logo.svg" alt="MIAMS Logo" className="logo-image" />
             </div>
           </div>
           <div className="brand-text">

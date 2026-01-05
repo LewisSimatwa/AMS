@@ -2,7 +2,6 @@ import { useState } from "react";
 import AssetTable from "./AssetsTable";
 import AssetDetail from "./AssetsDetails";
 import AssetRegistrationForm from "./AssetsRegistrationForm";
-import CheckInOutModal from "./CheckInOutModal";
 import MaintenanceForm from "./MaintenanceForm";
 import "../../styles/Assets.css";
 

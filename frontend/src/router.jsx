@@ -10,6 +10,9 @@ import Reports from "./features/reports/ReportsPage";
 import UserManagement from "./features/users/UserManagement";
 import MainLayout from "./layouts/MainLayout";
 import Maintenance from "./features/maintenance/Maintenance";
+import AuditLogs from "./features/audit/AuditLogs";
+import ProtectedRoute from "./components/ProtectedRoute";
+import CheckOut from "./features/assets/Checkout";
 
 export default function AppRouter() {
   return (
@@ -22,32 +25,20 @@ export default function AppRouter() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/select-institution" element={<SelectInstitution />} />
 
-        {/* Main layout routes */}
-        <Route element={<MainLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/assets" element={<AssetsDetails />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/maintanance" element={<Maintenance />} />
-          <Route path="/analytics" element={<PredictiveAnalytics />} />
-          <Route path="/users" element={<UserManagement />} />
-        </Route>
-
-                {/*
-        // Protected routes (to enable later)
+        {/* Protected routes */}
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/assets" element={<AssetsDetails />} />
-            <Route path="/analytics" element={<PredictiveAnalytics />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/maintenance" element={<Maintenance />} />
+            <Route path="/analytics" element={<PredictiveAnalytics />} />
             <Route path="/users" element={<UserManagement />} />
+            <Route path="/audit" element={<AuditLogs />} />
+            <Route path="/checkout" element={<CheckOut/>} />
           </Route>
         </Route>
-        */}
-
-
       </Routes>
     </BrowserRouter>
   );
 }
-

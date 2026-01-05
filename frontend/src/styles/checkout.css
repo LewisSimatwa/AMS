@@ -1,0 +1,57 @@
+.checkout-module {
+  padding: 20px;
+  font-family: sans-serif;
+}
+
+.asset-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.asset-card {
+  border: 1px solid #ddd;
+  padding: 15px;
+  width: 220px;
+  border-radius: 5px;
+  background: #f9f9f9;
+}
+
+.asset-card h3 {
+  margin: 0 0 5px 0;
+}
+
+.asset-card p {
+  margin: 3px 0;
+}
+
+.asset-card button {
+  margin-top: 5px;
+  width: 100%;
+  padding: 5px;
+  cursor: pointer;
+}
+
+.modal {
+  position: fixed;
+  top: 20%;
+  left: 40%;
+  background: white;
+  padding: 20px;
+  border: 2px solid #444;
+  border-radius: 8px;
+  z-index: 10;
+}
+
+.modal input,
+.modal textarea {
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 5px;
+}
+.modal button {
+  margin-right: 10px;
+}
+.error {
+  color: red;
+}

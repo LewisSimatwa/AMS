@@ -1,5 +1,14 @@
 <?php
+// ================================
+// MIAMS Helper Functions
+// ================================
+
+// Secret key for JWT
+if (!defined('JWT_SECRET')) define('JWT_SECRET', 'replace_this_with_your_secret');
+
+// -------------------
 // JWT Functions
+// -------------------
 if (!function_exists('generateToken')) {
     function generateToken($user) {
         $header = json_encode(['alg' => 'HS256', 'typ' => 'JWT']);
@@ -7,13 +16,15 @@ if (!function_exists('generateToken')) {
             'user_id' => $user['id'],
             'role' => $user['role'],
             'institution_id' => $user['institution_id'],
-            'exp' => time() + (24 * 3600)
+            'iat' => time(),          // issued at timestamp
+            'exp' => time() + (24 * 3600), // expires in 24h
+            'nonce' => bin2hex(random_bytes(8)) // random to ensure unique token
         ]);
 
-        $headerEnc = base64_encode($header);
-        $payloadEnc = base64_encode($payload);
+        $headerEnc = rtrim(strtr(base64_encode($header), '+/', '-_'), '=');
+        $payloadEnc = rtrim(strtr(base64_encode($payload), '+/', '-_'), '=');
         $signature = hash_hmac('sha256', "$headerEnc.$payloadEnc", JWT_SECRET, true);
-        $signatureEnc = base64_encode($signature);
+        $signatureEnc = rtrim(strtr(base64_encode($signature), '+/', '-_'), '=');
 
         return "$headerEnc.$payloadEnc.$signatureEnc";
     }
@@ -24,21 +35,24 @@ if (!function_exists('verifyToken')) {
         $parts = explode('.', $token);
         if (count($parts) !== 3) throw new Exception('Invalid token');
 
-        $headerEnc = $parts[0];
-        $payloadEnc = $parts[1];
-        $signatureEnc = $parts[2];
+        list($headerEnc, $payloadEnc, $signatureEnc) = $parts;
 
-        $signature = hash_hmac('sha256', "$headerEnc.$payloadEnc", JWT_SECRET, true);
-        if (base64_encode($signature) !== $signatureEnc) throw new Exception('Invalid signature');
+        $signatureCheck = hash_hmac('sha256', "$headerEnc.$payloadEnc", JWT_SECRET, true);
+        $signatureCheckEnc = rtrim(strtr(base64_encode($signatureCheck), '+/', '-_'), '=');
 
-        $payload = json_decode(base64_decode($payloadEnc), true);
+        if (!hash_equals($signatureCheckEnc, $signatureEnc)) throw new Exception('Invalid signature');
+
+        $payload = json_decode(base64_decode(strtr($payloadEnc, '-_', '+/')), true);
+
         if ($payload['exp'] < time()) throw new Exception('Token expired');
 
         return $payload;
     }
 }
 
-// Auth
+// -------------------
+// Auth Middleware
+// -------------------
 if (!function_exists('verifyAuth')) {
     function verifyAuth() {
         $headers = getallheaders();
@@ -53,7 +67,9 @@ if (!function_exists('verifyAuth')) {
     }
 }
 
-// Password
+// -------------------
+// Password Helpers
+// -------------------
 if (!function_exists('hashPassword')) {
     function hashPassword($pass) {
         return password_hash($pass, PASSWORD_BCRYPT, ['cost' => 10]);
@@ -66,23 +82,30 @@ if (!function_exists('checkPassword')) {
     }
 }
 
-// Response
+// -------------------
+// Response Helpers
+// -------------------
 if (!function_exists('respond')) {
     function respond($data, $code = 200) {
         http_response_code($code);
+        header('Content-Type: application/json');
         echo json_encode($data);
         exit;
     }
 }
 
-// Input
+// -------------------
+// Input Helpers
+// -------------------
 if (!function_exists('getInput')) {
     function getInput() {
         return json_decode(file_get_contents('php://input'), true);
     }
 }
 
-// Audit Log
+// -------------------
+// Audit Logs
+// -------------------
 if (!function_exists('logAudit')) {
     function logAudit($db, $user_id, $entity_type, $entity_id, $action, $old, $new) {
         $sql = "INSERT INTO audit_logs (user_id, entity_type, entity_id, action, old_values, new_values, created_at)
@@ -98,7 +121,9 @@ if (!function_exists('logAudit')) {
     }
 }
 
-// Check Role
+// -------------------
+// Role Check
+// -------------------
 if (!function_exists('checkRole')) {
     function checkRole($role, $allowed = []) {
         if (!in_array($role, $allowed)) {

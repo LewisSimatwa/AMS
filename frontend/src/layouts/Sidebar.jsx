@@ -8,9 +8,10 @@ export default function Sidebar({ isOpen, setIsOpen, user, onLogout }) {
 
   const menuItems = [
     { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { path: "/checkout", label: "Check In/Out", icon: ClipboardList },
     { path: "/assets", label: "Assets", icon: Package },
     { path: "/reports", label: "Reports", icon: FileText },
-    { path: "/maintanance", label: "Maintenance", icon: Wrench },
+    { path: "/maintenance", label: "Maintenance", icon: Wrench },
     { path: "/analytics", label: "Analytics", icon: BarChart3 },
     { path: "/audit", label: "Audit Logs", icon: ClipboardList },
   ];

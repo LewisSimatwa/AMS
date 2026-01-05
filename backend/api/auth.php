@@ -6,19 +6,20 @@ function login() {
     global $db;
     $input = getInput();
 
-    if (empty($input['email']) || empty($input['password'])) {
-        respond(['error' => 'Missing fields'], 400);
+    if (empty($input['email']) || empty($input['password']) || empty($input['institution_id'])) {
+    respond(['error' => 'Missing fields'], 400);
     }
 
     // Correct query: join user_roles and roles to get role name
-    $sql = "SELECT u.id, u.email, u.password_hash, r.name AS role, u.institution_id
-            FROM users u
-            JOIN user_roles ur ON u.id = ur.user_id
-            JOIN roles r ON ur.role_id = r.id
-            WHERE u.email = ?";
+     $sql = "SELECT u.id, u.email, u.password_hash, r.name AS role, u.institution_id
+        FROM users u
+        JOIN user_roles ur ON u.id = ur.user_id
+        JOIN roles r ON ur.role_id = r.id
+        WHERE u.email = ? AND u.institution_id = ?";
+
 
     $stmt = $db->prepare($sql);
-    $stmt->execute([$input['email']]);
+    $stmt->execute([$input['email'], $input['institution_id']]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$user || !checkPassword($input['password'], $user['password_hash'])) {
