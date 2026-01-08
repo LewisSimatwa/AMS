@@ -1,164 +1,266 @@
 <?php
-// api/maintenance.php
-header('Content-Type: application/json');
-header('Access-Control-Allow-Credentials: true');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+// Disable HTML error display and log errors instead
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+error_reporting(E_ALL);
+
+// Start output buffering
+ob_start();
+ob_end_clean();
+
+// CORS headers
+header("Access-Control-Allow-Origin: http://localhost:5173");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
+header("Content-Type: application/json");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
-// Start session
-session_start();
+// Load dependencies
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/helpers.php';
 
-// Database configuration
-$host = getenv('DB_HOST') ?: 'localhost';
-$port = getenv('DB_PORT') ?: '5432';
-$dbname = getenv('DB_NAME') ?: 'miams_db';
-$user = getenv('DB_USER') ?: 'postgres';
-$password = getenv('DB_PASSWORD') ?: 'password';
+// Verify authentication
+try {
+    verifyAuth();
+} catch (Exception $e) {
+    http_response_code(401);
+    echo json_encode(["success" => false, "error" => "Authentication failed: " . $e->getMessage()]);
+    exit;
+}
+
+$institution_id = $_GET['institution_id'];
+$user_id = $_GET['user_id'];
+$action = $_GET['action'] ?? 'list';
 
 try {
-    $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;";
-    $pdo = new PDO($dsn, $user, $password, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
-    ]);
-} catch (PDOException $e) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database connection failed']);
-    exit;
-}
-
-// Check authentication
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['institution_id'])) {
-    http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Not authenticated']);
-    exit;
-}
-
-$user_id = $_SESSION['user_id'];
-$institution_id = $_SESSION['institution_id'];
-
-// Get action from query string or POST
-$action = $_GET['action'] ?? $_POST['action'] ?? '';
-
-switch ($action) {
-    case 'list':
-        listMaintenanceRecords($pdo, $institution_id);
-        break;
-    
-    case 'schedule':
-        scheduleMaintenance($pdo, $user_id, $institution_id);
-        break;
-    
-    case 'get_assets':
-        getAssets($pdo, $institution_id);
-        break;
-    
-    case 'get_users':
-        getUsers($pdo, $institution_id);
-        break;
-    
-    case 'risk_scores':
-        getRiskScores($pdo, $institution_id);
-        break;
-    
-    default:
-        http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Invalid action']);
-        break;
-}
-
-function listMaintenanceRecords($pdo, $institution_id) {
-    try {
-        $query = "
-            SELECT 
-                mr.id,
-                mr.asset_id,
-                mr.maintenance_type,
-                mr.description,
-                mr.status,
-                mr.cost,
-                TO_CHAR(mr.start_date, 'YYYY-MM-DD') as start_date,
-                TO_CHAR(mr.end_date, 'YYYY-MM-DD') as end_date,
-                TO_CHAR(mr.created_at, 'YYYY-MM-DD HH24:MI') as created_at,
-                a.name as asset_name,
-                a.asset_code,
-                a.serial_number,
-                u1.first_name || ' ' || u1.last_name as reported_by_name,
-                u2.first_name || ' ' || u2.last_name as assigned_to_name
-            FROM maintenance_records mr
-            JOIN assets a ON mr.asset_id = a.id
-            LEFT JOIN users u1 ON mr.reported_by = u1.id
-            LEFT JOIN users u2 ON mr.assigned_to = u2.id
-            WHERE mr.institution_id = :institution_id
-            ORDER BY 
-                CASE mr.status
-                    WHEN 'open' THEN 1
-                    WHEN 'in_progress' THEN 2
-                    WHEN 'closed' THEN 3
-                END,
-                mr.created_at DESC
-        ";
+    switch ($action) {
+        case 'list':
+            listMaintenanceRecords($db, $institution_id);
+            break;
         
-        $stmt = $pdo->prepare($query);
-        $stmt->execute(['institution_id' => $institution_id]);
-        $records = $stmt->fetchAll();
+        case 'get_assets':
+            getAssets($db, $institution_id);
+            break;
         
-        echo json_encode([
-            'success' => true,
-            'records' => $records,
-            'count' => count($records)
-        ]);
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+        case 'get_users':
+            getUsers($db, $institution_id);
+            break;
+        
+        case 'risk_scores':
+            getRiskScores($db, $institution_id);
+            break;
+        
+        case 'schedule':
+            scheduleMaintenance($db, $institution_id, $user_id);
+            break;
+        
+        default:
+            http_response_code(400);
+            echo json_encode(["success" => false, "error" => "Invalid action"]);
     }
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(["success" => false, "error" => $e->getMessage()]);
 }
 
-function scheduleMaintenance($pdo, $user_id, $institution_id) {
-    // Get JSON input
-    $input = file_get_contents('php://input');
-    $data = json_decode($input, true);
+// List all maintenance records
+function listMaintenanceRecords($db, $institution_id) {
+    $stmt = $db->prepare("
+        SELECT 
+            mr.id,
+            mr.maintenance_type,
+            mr.description,
+            mr.status,
+            mr.cost,
+            mr.start_date,
+            mr.end_date,
+            mr.created_at,
+            a.name AS asset_name,
+            a.asset_code,
+            a.id AS asset_id,
+            u1.first_name || ' ' || u1.last_name AS reported_by_name,
+            u2.first_name || ' ' || u2.last_name AS assigned_to_name
+        FROM maintenance_records mr
+        LEFT JOIN assets a ON mr.asset_id = a.id
+        LEFT JOIN users u1 ON mr.reported_by = u1.id
+        LEFT JOIN users u2 ON mr.assigned_to = u2.id
+        WHERE mr.institution_id = ?
+        ORDER BY mr.created_at DESC
+    ");
+    
+    $stmt->execute([$institution_id]);
+    $records = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Format dates
+    foreach ($records as &$record) {
+        $record['start_date'] = $record['start_date'] ? date('Y-m-d', strtotime($record['start_date'])) : null;
+        $record['end_date'] = $record['end_date'] ? date('Y-m-d', strtotime($record['end_date'])) : null;
+        $record['created_at'] = date('Y-m-d H:i', strtotime($record['created_at']));
+    }
+    
+    echo json_encode([
+        "success" => true,
+        "records" => $records
+    ]);
+}
+
+// Get assets for scheduling
+function getAssets($db, $institution_id) {
+    $stmt = $db->prepare("
+        SELECT 
+            a.id,
+            a.name,
+            a.asset_code,
+            a.status,
+            at.name AS asset_type_name,
+            d.name AS department_name
+        FROM assets a
+        LEFT JOIN asset_types at ON a.asset_type_id = at.id
+        LEFT JOIN departments d ON a.department_id = d.id
+        WHERE a.institution_id = ?
+        ORDER BY a.name
+    ");
+    
+    $stmt->execute([$institution_id]);
+    $assets = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo json_encode([
+        "success" => true,
+        "assets" => $assets
+    ]);
+}
+
+// Get users for assignment
+function getUsers($db, $institution_id) {
+    $stmt = $db->prepare("
+        SELECT 
+            u.id,
+            u.username,
+            u.first_name,
+            u.last_name,
+            u.email
+        FROM users u
+        WHERE u.institution_id = ?
+        AND u.is_active = true
+        ORDER BY u.first_name, u.last_name
+    ");
+    
+    $stmt->execute([$institution_id]);
+    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo json_encode([
+        "success" => true,
+        "users" => $users
+    ]);
+}
+
+// Get risk scores for predictive maintenance
+function getRiskScores($db, $institution_id) {
+    $stmt = $db->prepare("
+        SELECT 
+            ars.id,
+            ars.risk_score,
+            ars.risk_level,
+            ars.predicted_failure_date,
+            ars.model_version,
+            ars.predicted_at,
+            a.id AS asset_id,
+            a.name AS asset_name,
+            a.asset_code
+        FROM asset_risk_scores ars
+        JOIN assets a ON ars.asset_id = a.id
+        WHERE ars.institution_id = ?
+        AND ars.risk_level IN ('MEDIUM', 'HIGH')
+        ORDER BY ars.risk_score DESC
+    ");
+    
+    $stmt->execute([$institution_id]);
+    $scores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Format dates
+    foreach ($scores as &$score) {
+        $score['predicted_failure_date'] = $score['predicted_failure_date'] ? 
+            date('Y-m-d', strtotime($score['predicted_failure_date'])) : null;
+        $score['predicted_at'] = date('Y-m-d H:i', strtotime($score['predicted_at']));
+    }
+    
+    echo json_encode([
+        "success" => true,
+        "scores" => $scores
+    ]);
+}
+
+// Schedule new maintenance
+function scheduleMaintenance($db, $institution_id, $user_id) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        throw new Exception("Method not allowed");
+    }
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    
+    if (!$input) {
+        throw new Exception("Invalid JSON input");
+    }
     
     // Validate required fields
-    if (empty($data['asset_id']) || empty($data['maintenance_type']) || 
-        empty($data['description']) || empty($data['start_date'])) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'message' => 'Missing required fields']);
-        return;
+    $asset_id = $input['asset_id'] ?? null;
+    $maintenance_type = $input['maintenance_type'] ?? 'preventive';
+    $description = $input['description'] ?? null;
+    $start_date = $input['start_date'] ?? null;
+    $assigned_to = $input['assigned_to'] ?? null;
+    $cost = $input['cost'] ?? 0;
+    
+    if (!$asset_id || !$description || !$start_date) {
+        throw new Exception("Asset, description, and start date are required");
     }
     
-    $asset_id = $data['asset_id'];
-    $maintenance_type = $data['maintenance_type'];
-    $description = $data['description'];
-    $start_date = $data['start_date'];
-    $assigned_to = !empty($data['assigned_to']) ? $data['assigned_to'] : null;
+    // Validate maintenance type
+    $valid_types = ['preventive', 'corrective', 'predictive'];
+    if (!in_array($maintenance_type, $valid_types)) {
+        throw new Exception("Invalid maintenance type");
+    }
+    
+    // Validate and sanitize cost
+    $cost = floatval($cost);
+    if ($cost < 0) {
+        throw new Exception("Cost cannot be negative");
+    }
+    
+    $db->beginTransaction();
     
     try {
-        // Verify asset belongs to institution
-        $check_query = "SELECT id FROM assets WHERE id = :asset_id AND institution_id = :institution_id";
-        $check_stmt = $pdo->prepare($check_query);
-        $check_stmt->execute([
-            'asset_id' => $asset_id,
-            'institution_id' => $institution_id
-        ]);
+        // Verify asset exists
+        $stmt = $db->prepare("
+            SELECT id, name, asset_code 
+            FROM assets 
+            WHERE id = ? AND institution_id = ?
+        ");
+        $stmt->execute([$asset_id, $institution_id]);
+        $asset = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        if (!$check_stmt->fetch()) {
-            http_response_code(404);
-            echo json_encode([
-                'success' => false,
-                'message' => 'Asset not found or does not belong to your institution'
-            ]);
-            return;
+        if (!$asset) {
+            throw new Exception("Asset not found");
+        }
+        
+        // If assigned to someone, verify user exists
+        if ($assigned_to) {
+            $stmt = $db->prepare("
+                SELECT id 
+                FROM users 
+                WHERE id = ? AND institution_id = ? AND is_active = true
+            ");
+            $stmt->execute([$assigned_to, $institution_id]);
+            if (!$stmt->fetch()) {
+                throw new Exception("Assigned user not found or inactive");
+            }
         }
         
         // Insert maintenance record
-        $insert_query = "
+        $stmt = $db->prepare("
             INSERT INTO maintenance_records (
                 institution_id,
                 asset_id,
@@ -167,179 +269,78 @@ function scheduleMaintenance($pdo, $user_id, $institution_id) {
                 maintenance_type,
                 description,
                 status,
+                cost,
                 start_date,
                 created_at,
                 updated_at
-            ) VALUES (
-                :institution_id,
-                :asset_id,
-                :reported_by,
-                :assigned_to,
-                :maintenance_type,
-                :description,
-                'open',
-                :start_date,
-                NOW(),
-                NOW()
-            )
+            ) VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, now(), now())
             RETURNING id
-        ";
+        ");
         
-        $stmt = $pdo->prepare($insert_query);
         $stmt->execute([
-            'institution_id' => $institution_id,
-            'asset_id' => $asset_id,
-            'reported_by' => $user_id,
-            'assigned_to' => $assigned_to,
-            'maintenance_type' => $maintenance_type,
-            'description' => $description,
-            'start_date' => $start_date
+            $institution_id,
+            $asset_id,
+            $user_id,
+            $assigned_to ?: null,
+            $maintenance_type,
+            $description,
+            $cost,
+            $start_date
         ]);
         
-        $result = $stmt->fetch();
-        $maintenance_id = $result['id'];
+        $maintenance_id = $stmt->fetchColumn();
         
-        // Update asset status to 'maintenance'
-        $update_query = "
+        // Update asset status to maintenance if not already
+        $stmt = $db->prepare("
             UPDATE assets 
-            SET status = 'maintenance', updated_at = NOW()
-            WHERE id = :asset_id AND status != 'maintenance'
-        ";
-        $update_stmt = $pdo->prepare($update_query);
-        $update_stmt->execute(['asset_id' => $asset_id]);
+            SET status = 'maintenance', updated_at = now()
+            WHERE id = ? AND status != 'maintenance'
+        ");
+        $stmt->execute([$asset_id]);
+        
+        // Create audit log
+        $stmt = $db->prepare("
+            INSERT INTO audit_logs (
+                institution_id,
+                user_id,
+                entity_type,
+                entity_id,
+                action,
+                new_values,
+                details,
+                created_at
+            ) VALUES (?, ?, 'maintenance_records', ?, 'CREATE', ?, ?, now())
+        ");
+        
+        $stmt->execute([
+            $institution_id,
+            $user_id,
+            $maintenance_id,
+            json_encode([
+                'asset_id' => $asset_id,
+                'asset_name' => $asset['name'],
+                'maintenance_type' => $maintenance_type,
+                'status' => 'open',
+                'cost' => $cost
+            ]),
+            json_encode([
+                'description' => $description,
+                'start_date' => $start_date
+            ])
+        ]);
+        
+        $db->commit();
         
         echo json_encode([
-            'success' => true,
-            'message' => 'Maintenance scheduled successfully',
-            'maintenance_id' => $maintenance_id
+            "success" => true,
+            "message" => "Maintenance scheduled successfully",
+            "maintenance_id" => $maintenance_id,
+            "cost" => $cost
         ]);
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
-    }
-}
-
-function getAssets($pdo, $institution_id) {
-    try {
-        $query = "
-            SELECT 
-                a.id,
-                a.asset_code,
-                a.serial_number,
-                a.name,
-                a.description,
-                a.status,
-                a.condition,
-                d.name as department_name,
-                at.name as asset_type_name
-            FROM assets a
-            LEFT JOIN departments d ON a.department_id = d.id
-            LEFT JOIN asset_types at ON a.asset_type_id = at.id
-            WHERE a.institution_id = :institution_id
-            ORDER BY a.name
-        ";
         
-        $stmt = $pdo->prepare($query);
-        $stmt->execute(['institution_id' => $institution_id]);
-        $assets = $stmt->fetchAll();
-        
-        echo json_encode([
-            'success' => true,
-            'assets' => $assets,
-            'count' => count($assets)
-        ]);
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
-    }
-}
-
-function getUsers($pdo, $institution_id) {
-    try {
-        $query = "
-            SELECT 
-                u.id,
-                u.username,
-                u.first_name,
-                u.last_name,
-                u.email,
-                r.name as role
-            FROM users u
-            JOIN user_roles ur ON u.id = ur.user_id
-            JOIN roles r ON ur.role_id = r.id
-            WHERE u.institution_id = :institution_id
-                AND u.is_active = true
-                AND r.name IN ('ict', 'admin')
-            ORDER BY u.first_name, u.last_name
-        ";
-        
-        $stmt = $pdo->prepare($query);
-        $stmt->execute(['institution_id' => $institution_id]);
-        $users = $stmt->fetchAll();
-        
-        echo json_encode([
-            'success' => true,
-            'users' => $users,
-            'count' => count($users)
-        ]);
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
-    }
-}
-
-function getRiskScores($pdo, $institution_id) {
-    try {
-        $query = "
-            SELECT 
-                ars.id,
-                ars.asset_id,
-                ars.risk_score,
-                ars.risk_level,
-                TO_CHAR(ars.predicted_failure_date, 'YYYY-MM-DD') as predicted_failure_date,
-                ars.model_version,
-                TO_CHAR(ars.predicted_at, 'YYYY-MM-DD HH24:MI') as predicted_at,
-                a.name as asset_name,
-                a.asset_code,
-                a.serial_number,
-                a.status as asset_status,
-                a.condition as asset_condition
-            FROM asset_risk_scores ars
-            JOIN assets a ON ars.asset_id = a.id
-            WHERE ars.institution_id = :institution_id
-                AND ars.risk_level IN ('MEDIUM', 'HIGH')
-                AND ars.id IN (
-                    SELECT MAX(id)
-                    FROM asset_risk_scores
-                    WHERE institution_id = :institution_id
-                    GROUP BY asset_id
-                )
-            ORDER BY 
-                CASE ars.risk_level
-                    WHEN 'HIGH' THEN 1
-                    WHEN 'MEDIUM' THEN 2
-                    WHEN 'LOW' THEN 3
-                END,
-                ars.risk_score DESC
-        ";
-        
-        $stmt = $pdo->prepare($query);
-        $stmt->execute(['institution_id' => $institution_id]);
-        $scores = $stmt->fetchAll();
-        
-        // Convert risk_score to float
-        foreach ($scores as &$score) {
-            $score['risk_score'] = (float)$score['risk_score'];
-        }
-        
-        echo json_encode([
-            'success' => true,
-            'scores' => $scores,
-            'count' => count($scores)
-        ]);
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    } catch (Exception $e) {
+        $db->rollBack();
+        throw $e;
     }
 }
 ?>

@@ -26,16 +26,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $configPath = __DIR__ . '/config.php';
 $helpersPath = __DIR__ . '/helpers.php';
 
-// Debug: check if files exist
 if (!file_exists($configPath)) {
     http_response_code(500);
-    echo json_encode(["error" => "config.php not found at: " . $configPath]);
+    echo json_encode(["error" => "config.php not found"]);
     exit;
 }
 
 if (!file_exists($helpersPath)) {
     http_response_code(500);
-    echo json_encode(["error" => "helpers.php not found at: " . $helpersPath]);
+    echo json_encode(["error" => "helpers.php not found"]);
     exit;
 }
 
@@ -44,7 +43,7 @@ require_once $helpersPath;
 
 // Verify JWT token authentication
 try {
-    verifyAuth(); // This sets $_GET['user_id'], $_GET['role'], $_GET['institution_id']
+    verifyAuth();
 } catch (Exception $e) {
     http_response_code(401);
     echo json_encode(["error" => "Authentication failed: " . $e->getMessage()]);
@@ -53,16 +52,35 @@ try {
 
 $institution_id = $_GET['institution_id'];
 
-// Fetch assets for institution
+// Fetch checked out assets
 try {
     $stmt = $db->prepare("
-        SELECT a.id, a.asset_code, a.name, a.status,
-               at.name AS asset_type_name,
-               d.name AS department_name
+        SELECT 
+            a.id, 
+            a.asset_code, 
+            a.name, 
+            a.status,
+            at.name AS asset_type_name,
+            d.name AS department_name,
+            u.first_name || ' ' || u.last_name AS holder_name,
+            a.current_holder_id,
+            t.to_location AS location,
+            t.performed_at AS checked_out_at
         FROM assets a
         LEFT JOIN asset_types at ON a.asset_type_id = at.id
         LEFT JOIN departments d ON a.department_id = d.id
+        LEFT JOIN users u ON a.current_holder_id = u.id
+        LEFT JOIN LATERAL (
+            SELECT to_location, performed_at
+            FROM transactions
+            WHERE asset_id = a.id 
+            AND transaction_type = 'check_out'
+            ORDER BY performed_at DESC
+            LIMIT 1
+        ) t ON true
         WHERE a.institution_id = ?
+        AND a.status IN ('on_loan', 'checked_out')
+        AND a.current_holder_id IS NOT NULL
         ORDER BY a.name
     ");
     
@@ -81,3 +99,4 @@ try {
     echo json_encode(["error" => "Error: " . $e->getMessage()]);
     exit;
 }
+?>

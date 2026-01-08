@@ -1,48 +1,115 @@
 <?php
+// Include CORS handler FIRST - before anything else
+require __DIR__ . '/cors.php';
+
+// Now enable error logging
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+error_reporting(E_ALL);
+
+// Log that we reached this file
+error_log("auth.php: Request received - Method: " . $_SERVER['REQUEST_METHOD']);
+
 require __DIR__ . '/config.php';
 require __DIR__ . '/helpers.php';
 
 function login() {
     global $db;
-    $input = getInput();
+    
+    try {
+        $input = getInput();
+        
+        error_log("auth.php login: Input received - " . json_encode($input));
 
-    if (empty($input['email']) || empty($input['password']) || empty($input['institution_id'])) {
-    respond(['error' => 'Missing fields'], 400);
+        if (empty($input['email']) || empty($input['password']) || empty($input['institution_id'])) {
+            error_log("auth.php login: Missing required fields");
+            respond(['error' => 'Missing fields'], 400);
+        }
+
+        // Fetch user with role
+        $sql = "SELECT u.id, u.email, u.username, u.first_name, u.last_name, u.password_hash, 
+                       r.name AS role, u.institution_id
+                FROM users u
+                LEFT JOIN user_roles ur ON u.id = ur.user_id
+                LEFT JOIN roles r ON ur.role_id = r.id
+                WHERE u.email = ? AND u.institution_id = ?
+                LIMIT 1";
+
+        $stmt = $db->prepare($sql);
+        $stmt->execute([$input['email'], $input['institution_id']]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
+            error_log("auth.php login: User not found - " . $input['email']);
+            respond(['error' => 'Invalid credentials'], 401);
+        }
+
+        if (!checkPassword($input['password'], $user['password_hash'])) {
+            error_log("auth.php login: Invalid password for - " . $input['email']);
+            respond(['error' => 'Invalid credentials'], 401);
+        }
+
+        // Log login in audit table
+        logAudit($db, $user['id'], 'auth', $user['id'], 'LOGIN', null, null);
+
+        // Generate JWT token
+        $token = generateToken($user);
+
+        // Update last login
+        $stmt = $db->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
+        $stmt->execute([$user['id']]);
+
+        // Remove password from response
+        unset($user['password_hash']);
+
+        error_log("auth.php login: Login successful for - " . $input['email']);
+
+        respond([
+            'token' => $token,
+            'user' => $user
+        ]);
+    } catch (Exception $e) {
+        error_log('auth.php login error: ' . $e->getMessage());
+        respond(['error' => 'Login failed: ' . $e->getMessage()], 500);
     }
-
-    // Correct query: join user_roles and roles to get role name
-     $sql = "SELECT u.id, u.email, u.password_hash, r.name AS role, u.institution_id
-        FROM users u
-        JOIN user_roles ur ON u.id = ur.user_id
-        JOIN roles r ON ur.role_id = r.id
-        WHERE u.email = ? AND u.institution_id = ?";
-
-
-    $stmt = $db->prepare($sql);
-    $stmt->execute([$input['email'], $input['institution_id']]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$user || !checkPassword($input['password'], $user['password_hash'])) {
-        respond(['error' => 'Invalid credentials'], 401);
-    }
-
-    // Log login in audit table
-    logAudit($db, $user['id'], 'auth', $user['id'], 'LOGIN', null, null);
-
-    // Generate JWT token
-    $token = generateToken($user);
-
-    respond([
-        'token' => $token,
-        'user' => [
-            'id' => $user['id'],
-            'email' => $user['email'],
-            'role' => $user['role'],
-            'institution_id' => $user['institution_id']
-        ]
-    ]);
 }
 
 function logout() {
-    respond(['message' => 'Logged out']);
+    try {
+        // Verify authentication
+        $decoded = verifyAuth();
+        
+        $user_id = $decoded['user_id'];
+        
+        // Log logout
+        global $db;
+        logAudit($db, $user_id, 'auth', $user_id, 'LOGOUT', null, null);
+        
+        respond(['message' => 'Logged out successfully']);
+    } catch (Exception $e) {
+        error_log('auth.php logout error: ' . $e->getMessage());
+        respond(['error' => 'Logout failed: ' . $e->getMessage()], 500);
+    }
 }
+
+// Route based on action
+$input = getInput();
+$action = $input['action'] ?? 'login';
+
+error_log("auth.php: Action requested - " . $action);
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    respond(['error' => 'Method not allowed'], 405);
+}
+
+switch ($action) {
+    case 'login':
+        login();
+        break;
+    case 'logout':
+        logout();
+        break;
+    default:
+        respond(['error' => 'Invalid action'], 400);
+}
+?>

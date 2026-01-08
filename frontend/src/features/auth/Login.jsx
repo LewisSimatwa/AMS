@@ -60,7 +60,7 @@ export default function Login() {
           <div className="logo-wrapper">
             <div className="logo-glow"></div>
             <div className="logo-container">
-              <img src="dist\miams_logo.svg" alt="MIAMS Logo" className="logo-image" />
+              <img src="frontend\public\miams_logo.svg" alt="MIAMS Logo" className="logo-image" />
             </div>
           </div>
           <div className="brand-text">

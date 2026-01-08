@@ -1,52 +1,78 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+// Disable HTML error display and log errors instead
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
-require __DIR__ . '/config.php';
-require __DIR__ . '/helpers.php';
+// Start output buffering to catch any stray output
+ob_start();
 
-/* HEADERS */
+// Clear any output and send headers
+ob_end_clean();
+
+// CORS headers
+header("Access-Control-Allow-Origin: http://localhost:5173");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Headers: Authorization, Content-Type");
-header("Access-Control-Allow-Methods: GET, OPTIONS");
 
+// Handle preflight OPTIONS request
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
-/* AUTH */
-$headers = getallheaders();
-if (!isset($headers['Authorization'])) {
-    respond(['error' => 'Missing Authorization header'], 401);
+// Load dependencies
+$configPath = __DIR__ . '/config.php';
+$helpersPath = __DIR__ . '/helpers.php';
+
+// Debug: check if files exist
+if (!file_exists($configPath)) {
+    http_response_code(500);
+    echo json_encode(["error" => "config.php not found at: " . $configPath]);
+    exit;
 }
 
-$token = str_replace('Bearer ', '', $headers['Authorization']);
+if (!file_exists($helpersPath)) {
+    http_response_code(500);
+    echo json_encode(["error" => "helpers.php not found at: " . $helpersPath]);
+    exit;
+}
 
+require_once $configPath;
+require_once $helpersPath;
+
+// Verify JWT token authentication
 try {
-    $user = verifyToken($token);
+    verifyAuth(); // This sets $_GET['user_id'], $_GET['role'], $_GET['institution_id']
 } catch (Exception $e) {
-    respond(['error' => $e->getMessage()], 401);
+    http_response_code(401);
+    echo json_encode(["error" => "Authentication failed: " . $e->getMessage()]);
+    exit;
 }
 
-/* ROLE CHECK */
-$allowedRoles = ['admin', 'auditor', 'ict'];
+$institution_id = $_GET['institution_id'];
+$user_role = $_GET['role'];
 
-if (!in_array($user['role'], $allowedRoles)) {
-    respond(['error' => 'Access denied'], 403);
+// STRICT Role check - only admin, security, and auditor can access audit logs
+$allowedRoles = ['admin', 'security', 'auditor'];
+
+if (!in_array(strtolower($user_role), array_map('strtolower', $allowedRoles))) {
+    http_response_code(403);
+    echo json_encode([
+        "error" => "Access denied. Only admin, security, and auditor roles can view audit logs.",
+        "your_role" => $user_role
+    ]);
+    exit;
 }
 
-/* FETCH LOGS */
+// Fetch audit logs
 try {
-    global $db;
-
-    $sql = "
+    $stmt = $db->prepare("
         SELECT
             a.id,
             a.created_at AS timestamp,
-            u.email AS performed_by,
+            COALESCE(u.username, u.email, 'System') AS performed_by,
             a.action,
             a.entity_type,
             a.entity_id,
@@ -59,12 +85,24 @@ try {
         WHERE a.institution_id = ?
         ORDER BY a.created_at DESC
         LIMIT 500
-    ";
+    ");
+    
+    $stmt->execute([$institution_id]);
+    $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $stmt = $db->prepare($sql);
-    $stmt->execute([$user['institution_id']]);
+    http_response_code(200);
+    echo json_encode([
+        "success" => true,
+        "logs" => $logs
+    ]);
 
-    respond(['logs' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode(["error" => "Database error: " . $e->getMessage()]);
+    exit;
 } catch (Exception $e) {
-    respond(['error' => 'Failed to fetch audit logs'], 500);
+    http_response_code(500);
+    echo json_encode(["error" => "Error: " . $e->getMessage()]);
+    exit;
 }
+?>

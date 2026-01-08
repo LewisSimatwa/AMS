@@ -136,7 +136,7 @@ export default function Reports() {
   /* ============================
      ✅ FIXED PDF GENERATION
      ============================ */
-  function generateReport() {
+  async function generateReport() {
     setGenerating(true);
 
     if (!token) {
@@ -145,22 +145,41 @@ export default function Reports() {
       return;
     }
 
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = "http://localhost:8000/generate_report.php";
-    form.target = "_blank";
+    try {
+      // Call the API endpoint with Authorization header
+      const response = await fetch('http://localhost:8000/generate_report.php', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = "token";
-    input.value = token;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate report');
+      }
 
-    form.appendChild(input);
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
+      // Get the PDF blob
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `asset_report_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
 
-    setGenerating(false);
+      alert('Report generated successfully!');
+    } catch (error) {
+      console.error('Generate report error:', error);
+      alert('Failed to generate report: ' + error.message);
+    } finally {
+      setGenerating(false);
+    }
   }
 
   if (loading) {
@@ -183,7 +202,7 @@ export default function Reports() {
           onClick={generateReport}
           disabled={generating}
         >
-          {generating ? "Generating..." : "Generate PDF Report"}
+          {generating ? "Generating..." : "📥 Generate PDF Report"}
         </button>
       </div>
 
@@ -205,7 +224,7 @@ export default function Reports() {
         <input type="date" name="endDate" value={filters.endDate} onChange={handleFilterChange} />
 
         <button onClick={fetchAuditLogs} className="refresh-btn">
-          Refresh
+          🔄 Refresh
         </button>
       </div>
 

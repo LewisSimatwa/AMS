@@ -2,35 +2,13 @@ import { useState } from "react";
 import AssetTable from "./AssetsTable";
 import AssetDetail from "./AssetsDetails";
 import AssetRegistrationForm from "./AssetsRegistrationForm";
-import MaintenanceForm from "./MaintenanceForm";
+import DeleteConfirmationModal from "./DeleteConfirmationModal";
 import "../../styles/Assets.css";
 
 export default function AssetsDetails() {
-  // default asset for testing
-  const defaultAsset = {
-    id: 1,
-    name: "Laptop A",
-    tag: "QR123",
-    assignedTo: "John Doe",
-    department: "IT",
-    status: "Active",
-    history: ["Registered on 2025-12-16"],
-  };
-
-  const [assets, setAssets] = useState([defaultAsset]);
-  const [selectedAsset, setSelectedAsset] = useState(defaultAsset);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [selectedAsset, setSelectedAsset] = useState(null);
   const [activeModal, setActiveModal] = useState(null);
-
-  function addAsset(asset) {
-    setAssets((prev) => [...prev, asset]);
-  }
-
-  function updateAsset(updatedAsset) {
-    setAssets((prev) =>
-      prev.map((a) => (a.id === updatedAsset.id ? updatedAsset : a))
-    );
-    if (selectedAsset?.id === updatedAsset.id) setSelectedAsset(updatedAsset);
-  }
 
   function openModal(type, asset) {
     setSelectedAsset(asset);
@@ -42,6 +20,17 @@ export default function AssetsDetails() {
     setActiveModal(null);
   }
 
+  function handleDeleteComplete() {
+    // Trigger refresh after deletion
+    setRefreshTrigger((prev) => prev + 1);
+    closeModal();
+  }
+
+  function handleAssetRegistered() {
+    // Trigger refresh after new asset is registered
+    setRefreshTrigger((prev) => prev + 1);
+  }
+
   return (
     <div className="assets-page">
       <div className="assets-header">
@@ -49,13 +38,12 @@ export default function AssetsDetails() {
         <p>Register, track, assign, and maintain institutional assets</p>
       </div>
 
-      <AssetRegistrationForm addAsset={addAsset} />
+      <AssetRegistrationForm onAssetRegistered={handleAssetRegistered} />
 
       <AssetTable
-        assets={assets}
         onView={(asset) => openModal("detail", asset)}
-        onCheckInOut={(asset) => openModal("movement", asset)}
-        onMaintenance={(asset) => openModal("maintenance", asset)}
+        onDelete={(asset) => openModal("delete", asset)}
+        refreshTrigger={refreshTrigger}
       />
 
       {/* Modals */}
@@ -63,19 +51,11 @@ export default function AssetsDetails() {
         <AssetDetail asset={selectedAsset} onClose={closeModal} />
       )}
 
-      {activeModal === "movement" && selectedAsset && (
-        <CheckInOutModal
+      {activeModal === "delete" && selectedAsset && (
+        <DeleteConfirmationModal
           asset={selectedAsset}
-          updateAsset={updateAsset}
           onClose={closeModal}
-        />
-      )}
-
-      {activeModal === "maintenance" && selectedAsset && (
-        <MaintenanceForm
-          asset={selectedAsset}
-          updateAsset={updateAsset}
-          onClose={closeModal}
+          onConfirm={handleDeleteComplete}
         />
       )}
     </div>

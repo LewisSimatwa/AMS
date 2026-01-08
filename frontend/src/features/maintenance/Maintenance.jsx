@@ -23,8 +23,11 @@ const Maintenance = () => {
     maintenance_type: 'preventive',
     description: '',
     start_date: '',
-    assigned_to: ''
+    assigned_to: '',
+    cost: ''
   });
+
+  const token = localStorage.getItem('token');
 
   useEffect(() => {
     fetchAllData();
@@ -48,10 +51,11 @@ const Maintenance = () => {
 
   const fetchMaintenanceRecords = async () => {
     try {
-      const response = await fetch('/api/maintenance.php?action=list', {
-        credentials: 'include'
+      const response = await fetch('http://localhost:8000/maintenance.php?action=list', {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
+      console.log('Maintenance records:', data);
       if (data.success) {
         setMaintenanceRecords(data.records);
       }
@@ -62,10 +66,11 @@ const Maintenance = () => {
 
   const fetchAssets = async () => {
     try {
-      const response = await fetch('/api/maintenance.php?action=get_assets', {
-        credentials: 'include'
+      const response = await fetch('http://localhost:8000/maintenance.php?action=get_assets', {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
+      console.log('Assets:', data);
       if (data.success) {
         setAssets(data.assets);
       }
@@ -76,10 +81,11 @@ const Maintenance = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch('/api/maintenance.php?action=get_users', {
-        credentials: 'include'
+      const response = await fetch('http://localhost:8000/maintenance.php?action=get_users', {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
+      console.log('Users:', data);
       if (data.success) {
         setUsers(data.users);
       }
@@ -90,10 +96,11 @@ const Maintenance = () => {
 
   const fetchRiskScores = async () => {
     try {
-      const response = await fetch('/api/maintenance.php?action=risk_scores', {
-        credentials: 'include'
+      const response = await fetch('http://localhost:8000/maintenance.php?action=risk_scores', {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
+      console.log('Risk scores:', data);
       if (data.success) {
         setRiskScores(data.scores);
       }
@@ -106,10 +113,12 @@ const Maintenance = () => {
     e.preventDefault();
     
     try {
-      const response = await fetch('/api/maintenance.php?action=schedule', {
+      const response = await fetch('http://localhost:8000/maintenance.php?action=schedule', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(scheduleForm)
       });
       
@@ -121,7 +130,7 @@ const Maintenance = () => {
         resetScheduleForm();
         fetchMaintenanceRecords();
       } else {
-        alert(data.message || 'Failed to schedule maintenance');
+        alert(data.error || 'Failed to schedule maintenance');
       }
     } catch (error) {
       console.error('Error scheduling maintenance:', error);
@@ -135,7 +144,8 @@ const Maintenance = () => {
       maintenance_type: 'preventive',
       description: '',
       start_date: '',
-      assigned_to: ''
+      assigned_to: '',
+      cost: ''
     });
   };
 
@@ -169,7 +179,8 @@ const Maintenance = () => {
   const openScheduleModal = (assetId = '') => {
     setScheduleForm({
       ...scheduleForm,
-      asset_id: assetId
+      asset_id: assetId,
+      cost: ''
     });
     setShowScheduleModal(true);
   };
@@ -190,7 +201,7 @@ const Maintenance = () => {
       {/* Header */}
       <div className="maintenance-header">
         <div>
-          <h1 className="maintenance-title">Maintenance Management</h1>
+          <h1 className="maintenance-title">🔧 Maintenance Management</h1>
           <p className="maintenance-subtitle">Schedule, track, and manage asset maintenance</p>
         </div>
         <button 
@@ -485,7 +496,7 @@ const Maintenance = () => {
             </div>
             <form onSubmit={handleScheduleMaintenance} className="modal-content">
               <div className="form-group">
-                <label className="form-label">Asset *</label>
+                <label className="form-label">Asset * {assets.length > 0 && `(${assets.length} available)`}</label>
                 <select
                   value={scheduleForm.asset_id}
                   onChange={(e) => setScheduleForm({...scheduleForm, asset_id: e.target.value})}
@@ -523,6 +534,7 @@ const Maintenance = () => {
                   className="input-field textarea-field"
                   rows="3"
                   required
+                  placeholder="Describe the maintenance work needed..."
                 ></textarea>
               </div>
 
@@ -538,13 +550,29 @@ const Maintenance = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Assign To</label>
+                <label className="form-label">Estimated Cost</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={scheduleForm.cost}
+                  onChange={(e) => setScheduleForm({...scheduleForm, cost: e.target.value})}
+                  className="input-field"
+                  placeholder="0.00"
+                />
+                <small style={{color: '#6c757d', fontSize: '12px', marginTop: '4px', display: 'block'}}>
+                  Leave blank if cost is not yet determined
+                </small>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Assign To {users.length > 0 && `(${users.length} users)`}</label>
                 <select
                   value={scheduleForm.assigned_to}
                   onChange={(e) => setScheduleForm({...scheduleForm, assigned_to: e.target.value})}
                   className="input-field"
                 >
-                  <option value="">Select User</option>
+                  <option value="">Select User (Optional)</option>
                   {users.map((user) => (
                     <option key={user.id} value={user.id}>
                       {user.first_name} {user.last_name} ({user.username})

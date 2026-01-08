@@ -12,7 +12,7 @@ ob_end_clean();
 
 // CORS headers
 header("Access-Control-Allow-Origin: http://localhost:5173");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Methods: GET, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Content-Type: application/json");
 
@@ -23,23 +23,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // Load dependencies
-$configPath = __DIR__ . '/config.php';
-$helpersPath = __DIR__ . '/helpers.php';
-
-if (!file_exists($configPath)) {
-    http_response_code(500);
-    echo json_encode(["error" => "config.php not found"]);
-    exit;
-}
-
-if (!file_exists($helpersPath)) {
-    http_response_code(500);
-    echo json_encode(["error" => "helpers.php not found"]);
-    exit;
-}
-
-require_once $configPath;
-require_once $helpersPath;
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/helpers.php';
 
 // Verify JWT token authentication
 try {
@@ -50,37 +35,36 @@ try {
     exit;
 }
 
+$user_id = $_GET['user_id'];
 $institution_id = $_GET['institution_id'];
 
-// Fetch active users for the institution
 try {
+    // Get user's primary role
     $stmt = $db->prepare("
-        SELECT 
-            u.id, 
-            u.username, 
-            u.email,
-            u.first_name, 
-            u.last_name,
-            u.is_active
+        SELECT r.name as role, u.id as user_id
         FROM users u
-        WHERE u.institution_id = ?
-        AND u.is_active = true
-        ORDER BY u.first_name, u.last_name
+        JOIN user_roles ur ON u.id = ur.user_id
+        JOIN roles r ON ur.role_id = r.id
+        WHERE u.id = ? AND u.institution_id = ?
+        LIMIT 1
     ");
     
-    $stmt->execute([$institution_id]);
-    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt->execute([$user_id, $institution_id]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    http_response_code(200);
-    echo json_encode($users);
+    if ($result) {
+        http_response_code(200);
+        echo json_encode([
+            'role' => $result['role'],
+            'user_id' => (int)$result['user_id']
+        ]);
+    } else {
+        http_response_code(404);
+        echo json_encode(["error" => "User role not found"]);
+    }
 
 } catch (PDOException $e) {
     http_response_code(500);
     echo json_encode(["error" => "Database error: " . $e->getMessage()]);
     exit;
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(["error" => "Error: " . $e->getMessage()]);
-    exit;
 }
-?>

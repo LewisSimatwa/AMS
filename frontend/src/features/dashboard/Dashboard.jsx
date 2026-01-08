@@ -256,15 +256,15 @@ export default function Dashboard() {
         <div className="action-buttons">
           <button
             className="action-btn"
-            onClick={() => navigate("/assets")}
+            onClick={() => navigate("/checkout")}
           >
-            View Assets
+            Check In/Out
           </button>
           <button
             className="action-btn"
-            onClick={() => navigate("/reports")}
+            onClick={() => navigate("/assets")}
           >
-            Generate Report
+            View Assets
           </button>
           <button
             className="action-btn"

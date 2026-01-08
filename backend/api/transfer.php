@@ -53,13 +53,13 @@ if (!$input) {
 
 // Validate required fields
 $assetId = $input['assetId'] ?? null;
-$toUserId = $input['toUserId'] ?? null;
+$toDepartmentId = $input['toDepartmentId'] ?? null;
 $location = $input['location'] ?? '';
 $remarks = $input['remarks'] ?? '';
 
-if (!$assetId || !$toUserId) {
+if (!$assetId || !$toDepartmentId) {
     http_response_code(400);
-    echo json_encode(["error" => "Asset and user are required"]);
+    echo json_encode(["error" => "Asset and department are required"]);
     exit;
 }
 
@@ -68,9 +68,11 @@ try {
 
     // Check if asset exists and is available
     $stmt = $db->prepare("
-        SELECT id, asset_code, name, status, department_id
-        FROM assets 
-        WHERE id = ? AND institution_id = ?
+        SELECT a.id, a.asset_code, a.name, a.status, a.department_id,
+               d.name AS from_department_name
+        FROM assets a
+        LEFT JOIN departments d ON a.department_id = d.id
+        WHERE a.id = ? AND a.institution_id = ?
     ");
     $stmt->execute([$assetId, $institution_id]);
     $asset = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -80,53 +82,59 @@ try {
     }
 
     if ($asset['status'] !== 'available') {
-        throw new Exception("Asset is not available for checkout. Current status: " . $asset['status']);
+        throw new Exception("Asset must be available for transfer. Current status: " . $asset['status']);
     }
 
-    // Verify user exists and belongs to institution
+    // Verify target department exists and belongs to institution
     $stmt = $db->prepare("
-        SELECT id, first_name, last_name
-        FROM users 
-        WHERE id = ? AND institution_id = ? AND is_active = true
+        SELECT id, name, code
+        FROM departments 
+        WHERE id = ? AND institution_id = ?
     ");
-    $stmt->execute([$toUserId, $institution_id]);
-    $toUser = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt->execute([$toDepartmentId, $institution_id]);
+    $toDepartment = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$toUser) {
-        throw new Exception("User not found or inactive");
+    if (!$toDepartment) {
+        throw new Exception("Target department not found");
     }
 
-    // Update asset status and current holder
+    // Check if already in the same department
+    if ($asset['department_id'] == $toDepartmentId) {
+        throw new Exception("Asset is already in " . $toDepartment['name']);
+    }
+
+    $fromDepartmentId = $asset['department_id'];
+
+    // Update asset department
     $stmt = $db->prepare("
         UPDATE assets 
-        SET status = 'on_loan',
-            current_holder_id = ?,
+        SET department_id = ?,
             updated_at = now()
         WHERE id = ?
     ");
-    $stmt->execute([$toUserId, $assetId]);
+    $stmt->execute([$toDepartmentId, $assetId]);
 
-    // Create transaction record
+    // Create transfer transaction record
     $stmt = $db->prepare("
         INSERT INTO transactions (
             institution_id,
             asset_id,
             transaction_type,
-            to_user_id,
             from_department_id,
             to_department_id,
+            from_location,
             to_location,
             remarks,
             performed_by,
             performed_at
-        ) VALUES (?, ?, 'check_out', ?, ?, ?, ?, ?, ?, now())
+        ) VALUES (?, ?, 'transfer', ?, ?, ?, ?, ?, ?, now())
     ");
     $stmt->execute([
         $institution_id,
         $assetId,
-        $toUserId,
-        $asset['department_id'],
-        $asset['department_id'],
+        $fromDepartmentId,
+        $toDepartmentId,
+        '',
         $location,
         $remarks,
         $user_id
@@ -140,19 +148,23 @@ try {
             entity_type,
             entity_id,
             action,
+            old_values,
             new_values,
             details,
             created_at
-        ) VALUES (?, ?, 'assets', ?, 'CHECK_OUT', ?, ?, now())
+        ) VALUES (?, ?, 'assets', ?, 'TRANSFER', ?, ?, ?, now())
     ");
     $stmt->execute([
         $institution_id,
         $user_id,
         $assetId,
         json_encode([
-            'status' => 'on_loan',
-            'current_holder_id' => $toUserId,
-            'holder_name' => $toUser['first_name'] . ' ' . $toUser['last_name']
+            'department_id' => $fromDepartmentId,
+            'department_name' => $asset['from_department_name']
+        ]),
+        json_encode([
+            'department_id' => $toDepartmentId,
+            'department_name' => $toDepartment['name']
         ]),
         json_encode([
             'location' => $location,
@@ -165,9 +177,10 @@ try {
     http_response_code(200);
     echo json_encode([
         "success" => true,
-        "message" => "Asset checked out successfully",
+        "message" => "Asset transferred successfully",
         "asset_code" => $asset['asset_code'],
-        "holder" => $toUser['first_name'] . ' ' . $toUser['last_name']
+        "from_department" => $asset['from_department_name'],
+        "to_department" => $toDepartment['name']
     ]);
 
 } catch (PDOException $e) {

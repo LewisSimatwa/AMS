@@ -53,24 +53,23 @@ try {
 
 $institution_id = $_GET['institution_id'];
 
-// Fetch assets for institution
+// Fetch departments for the institution
 try {
     $stmt = $db->prepare("
-        SELECT a.id, a.asset_code, a.name, a.status,
-               at.name AS asset_type_name,
-               d.name AS department_name
-        FROM assets a
-        LEFT JOIN asset_types at ON a.asset_type_id = at.id
-        LEFT JOIN departments d ON a.department_id = d.id
-        WHERE a.institution_id = ?
-        ORDER BY a.name
+        SELECT 
+            id, 
+            name, 
+            code
+        FROM departments
+        WHERE institution_id = ?
+        ORDER BY name
     ");
     
     $stmt->execute([$institution_id]);
-    $assets = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $departments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     http_response_code(200);
-    echo json_encode($assets);
+    echo json_encode($departments);
 
 } catch (PDOException $e) {
     http_response_code(500);
@@ -81,3 +80,4 @@ try {
     echo json_encode(["error" => "Error: " . $e->getMessage()]);
     exit;
 }
+?>

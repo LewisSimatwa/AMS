@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import "../../styles/AssetsTable.css";
 
-export default function AssetTable({ onView, onCheckInOut, onMaintenance, refreshTrigger }) {
+export default function AssetTable({ onView, onDelete, refreshTrigger }) {
   const navigate = useNavigate();
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [userRole, setUserRole] = useState("");
 
   const token = localStorage.getItem("token");
   const institutionId = localStorage.getItem("institutionId");
@@ -15,6 +17,14 @@ export default function AssetTable({ onView, onCheckInOut, onMaintenance, refres
     if (!token || !institutionId) {
       navigate("/login");
       return;
+    }
+
+    // Get user role from token (decode JWT)
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      setUserRole(payload.role || "");
+    } catch (e) {
+      console.error("Failed to decode token:", e);
     }
 
     fetchAssets();
@@ -112,9 +122,17 @@ export default function AssetTable({ onView, onCheckInOut, onMaintenance, refres
                 </span>
               </td>
               <td className="actions">
-                <button onClick={() => onView(asset)}>View</button>
-                <button onClick={() => onCheckInOut(asset)}>Move</button>
-                <button onClick={() => onMaintenance(asset)}>Status</button>
+                <button onClick={() => onView(asset)} className="btn-view">
+                  View
+                </button>
+                {userRole === "admin" && (
+                  <button 
+                    onClick={() => onDelete(asset)} 
+                    className="btn-delete"
+                  >
+                    Delete
+                  </button>
+                )}
               </td>
             </tr>
           ))}

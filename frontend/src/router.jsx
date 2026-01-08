@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./features/auth/Login";
 import CreateAccount from "./features/auth/CreateAccount";
 import ForgotPassword from "./features/auth/ForgotPassword";
-import SelectInstitution from "./features/institutions/SelectInstitution";
+//import SelectInstitution from "./features/institutions/SelectInstitution";
 import Dashboard from "./features/dashboard/Dashboard";
 import AssetsDetails from "./features/assets/AssetsDetails";
 import PredictiveAnalytics from "./features/analytics/PredictiveAnalytics";
@@ -23,7 +23,6 @@ export default function AppRouter() {
         <Route path="/login" element={<Login />} />
         <Route path="/create-account" element={<CreateAccount />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/select-institution" element={<SelectInstitution />} />
 
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>
