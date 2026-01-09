@@ -88,7 +88,7 @@ try {
             handleReports($db, $method, $path);
         }
         elseif (strpos($path, '/audit') === 0) {
-            require 'audit.php';
+            require 'audit_logs.php';
             handleAudit($db, $method, $path);
         }
         elseif (strpos($path, '/users') === 0) {

@@ -78,7 +78,28 @@ export default function CreateAccount() {
 
   return (
     <div className="login-container">
-      <div className="login-left">{/* Branding section */}</div>
+      <div className="login-left">
+            <div className="login-left">
+        <div className="bg-decoration">
+          <div className="bg-circle bg-circle-1"></div>
+          <div className="bg-circle bg-circle-2"></div>
+        </div>
+        <div className="brand-content">
+          <div className="logo-wrapper">
+            <div className="logo-glow"></div>
+            <div className="logo-container">
+              <img src="frontend\public\miams_logo.svg" alt="MIAMS Logo" className="logo-image" />
+            </div>
+          </div>
+          <div className="brand-text">
+            <h2 className="brand-title">MIAMS</h2>
+            <p className="brand-subtitle">
+              Multi-institutional Asset Management System
+            </p>
+          </div>
+        </div>
+      </div>  
+      </div>
       <div className="login-right">
         <div className="form-wrapper">
           <div className="login-card">

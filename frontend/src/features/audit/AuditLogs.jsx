@@ -10,48 +10,30 @@ export default function AuditLogs() {
     const fetchAuditLogs = async () => {
       try {
         const token = localStorage.getItem("token");
-        console.log("Token:", token ? "exists" : "missing");
+        const institutionId = localStorage.getItem("institutionId");
         
         if (!token) throw new Error("Not authenticated");
+        if (!institutionId) throw new Error("No institution ID");
 
-        // Fixed URL - removed /api/ path
-        const url = "http://localhost:8000/audit_logs.php";
+        // Use the API router endpoint
+        const url = `http://localhost:8000/api/audit/logs?institution_id=${institutionId}`;
         console.log("Fetching from:", url);
 
         const res = await fetch(url, {
           headers: {
             Authorization: `Bearer ${token}`,
+            "X-Institution-ID": institutionId,
           },
         });
 
         console.log("Response status:", res.status);
-        console.log("Response headers:", res.headers.get("content-type"));
 
-        // Get response text first to see what's actually returned
-        const text = await res.text();
-        console.log("Raw response:", text.substring(0, 200));
-
-        // Check if response is ok
         if (!res.ok) {
-          let errorData;
-          try {
-            errorData = JSON.parse(text);
-          } catch {
-            errorData = { error: `HTTP ${res.status}: ${text.substring(0, 100)}` };
-          }
+          const errorData = await res.json();
           throw new Error(errorData.error || `HTTP ${res.status}`);
         }
 
-        // Parse JSON
-        let data;
-        try {
-          data = JSON.parse(text);
-        } catch (parseError) {
-          console.error("JSON parse error:", parseError);
-          console.error("Response text:", text);
-          throw new Error("Server returned invalid JSON: " + text.substring(0, 100));
-        }
-
+        const data = await res.json();
         console.log("Data received:", data);
         
         if (data.error) {
@@ -106,7 +88,7 @@ export default function AuditLogs() {
           <span className="stat-label">Today</span>
           <span className="stat-value">
             {logs.filter(log => {
-              const logDate = new Date(log.timestamp);
+              const logDate = new Date(log.created_at);
               const today = new Date();
               return logDate.toDateString() === today.toDateString();
             }).length}
@@ -141,7 +123,7 @@ export default function AuditLogs() {
             {logs.map((log) => (
               <tr key={log.id}>
                 <td className="timestamp-cell">
-                  {new Date(log.timestamp).toLocaleString('en-US', {
+                  {new Date(log.created_at).toLocaleString('en-US', {
                     year: 'numeric',
                     month: 'short',
                     day: 'numeric',
@@ -149,17 +131,17 @@ export default function AuditLogs() {
                     minute: '2-digit'
                   })}
                 </td>
-                <td className="user-cell">{log.performed_by}</td>
+                <td className="user-cell">{log.username}</td>
                 <td className={`action-cell action-${log.action.toLowerCase()}`}>
                   <span className="action-badge">{log.action}</span>
                 </td>
                 <td className="entity-cell">{log.entity_type || "-"}</td>
                 <td className="entity-id-cell">{log.entity_id || "-"}</td>
                 <td className="value-cell old-value">
-                  <pre>{formatValue(log.old_value)}</pre>
+                  <pre>{formatValue(log.old_values)}</pre>
                 </td>
                 <td className="value-cell new-value">
-                  <pre>{formatValue(log.new_value)}</pre>
+                  <pre>{formatValue(log.new_values)}</pre>
                 </td>
                 <td className="institution-cell">{log.institution_name}</td>
               </tr>

@@ -86,12 +86,12 @@ export default function Login() {
               </div>
             )}
 
-            <div className="form-content">
+            <form className="form-content" onSubmit={handleSubmit}>
               {/* Institution Selection */}
               <div className="form-field">
                 <label className="field-label">Institution</label>
                 <div className="input-group">
-                  <Building className="input-icon" />
+                  <Building className="input-icon" size={20} strokeWidth={2} />
                   <select
                     name="institution_id"
                     value={form.institution_id}
@@ -115,7 +115,7 @@ export default function Login() {
               <div className="form-field">
                 <label className="field-label">Email Address</label>
                 <div className="input-group">
-                  <Mail className="input-icon" />
+                  <Mail className="input-icon" size={20} strokeWidth={2} />
                   <input
                     type="email"
                     name="email"
@@ -132,7 +132,7 @@ export default function Login() {
               <div className="form-field">
                 <label className="field-label">Password</label>
                 <div className="input-group">
-                  <Lock className="input-icon" />
+                  <Lock className="input-icon" size={20} strokeWidth={2} />
                   <input
                     type={showPassword ? "text" : "password"}
                     name="password"
@@ -163,7 +163,7 @@ export default function Login() {
               </div>
 
               <button
-                onClick={handleSubmit}
+                type="submit"
                 disabled={loading}
                 className="submit-button"
               >
@@ -179,7 +179,7 @@ export default function Login() {
                   </>
                 )}
               </button>
-            </div>
+            </form>
 
             <div className="divider">
               <span className="divider-text">New to MIAMS?</span>
