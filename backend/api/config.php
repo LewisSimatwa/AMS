@@ -1,7 +1,10 @@
 <?php
-// Enable error reporting for debugging
+// config.php
+// NO WHITESPACE BEFORE THIS LINE!
+
+// Disable display errors to prevent HTML output
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', 0); // Changed from 1 to 0
 ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/error.log');
 
@@ -56,13 +59,11 @@ try {
 } catch (PDOException $e) {
     error_log('Database connection error: ' . $e->getMessage());
     http_response_code(500);
-    header('Content-Type: application/json');
     echo json_encode(['error' => 'Database connection failed: ' . $e->getMessage()]);
     exit;
 } catch (Exception $e) {
     error_log('Configuration error: ' . $e->getMessage());
     http_response_code(500);
-    header('Content-Type: application/json');
     echo json_encode(['error' => 'Configuration error: ' . $e->getMessage()]);
     exit;
 }

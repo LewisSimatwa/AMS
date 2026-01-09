@@ -14,6 +14,7 @@ export default function Sidebar({ isOpen, setIsOpen, user, onLogout }) {
     { path: "/maintenance", label: "Maintenance", icon: Wrench },
     { path: "/analytics", label: "Analytics", icon: BarChart3 },
     { path: "/audit", label: "Audit Logs", icon: ClipboardList },
+    { path: "/usermanagement", label: "User Management", icon: ClipboardList },
   ];
 
   const handleLogout = () => {

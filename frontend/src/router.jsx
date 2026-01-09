@@ -14,6 +14,7 @@ import AuditLogs from "./features/audit/AuditLogs";
 import ProtectedRoute from "./components/ProtectedRoute";
 import CheckOut from "./features/assets/Checkout";
 
+
 export default function AppRouter() {
   return (
     <BrowserRouter>
@@ -35,6 +36,7 @@ export default function AppRouter() {
             <Route path="/users" element={<UserManagement />} />
             <Route path="/audit" element={<AuditLogs />} />
             <Route path="/checkout" element={<CheckOut/>} />
+            <Route path="/usermanagement" element={<UserManagement/>} />
           </Route>
         </Route>
       </Routes>

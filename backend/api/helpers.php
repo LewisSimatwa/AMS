@@ -5,6 +5,64 @@
 if (!defined('JWT_SECRET')) define('JWT_SECRET', 'replace_this_with_your_secret');
 
 // -------------------
+// Header Helper Function
+// -------------------
+if (!function_exists('getAllHeadersCaseInsensitive')) {
+    function getAllHeadersCaseInsensitive() {
+        $headers = [];
+        
+        // Try getallheaders first
+        if (function_exists('getallheaders')) {
+            $headers = getallheaders();
+        } else {
+            // Fallback to $_SERVER
+            foreach ($_SERVER as $key => $value) {
+                if (substr($key, 0, 5) === 'HTTP_') {
+                    $header = str_replace(' ', '-', ucwords(str_replace('_', ' ', strtolower(substr($key, 5)))));
+                    $headers[$header] = $value;
+                }
+            }
+        }
+        
+        // Convert to case-insensitive array
+        return array_change_key_case($headers, CASE_LOWER);
+    }
+}
+
+if (!function_exists('getAuthorizationHeader')) {
+    function getAuthorizationHeader() {
+        $headers = getAllHeadersCaseInsensitive();
+        
+        // Check in headers first
+        if (isset($headers['authorization'])) {
+            return $headers['authorization'];
+        }
+        
+        // Check $_SERVER variables
+        if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+            return $_SERVER['HTTP_AUTHORIZATION'];
+        }
+        
+        if (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+            return $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+        }
+        
+        // Check Apache-specific
+        if (function_exists('apache_request_headers')) {
+            $apacheHeaders = apache_request_headers();
+            if (isset($apacheHeaders['Authorization'])) {
+                return $apacheHeaders['Authorization'];
+            }
+            if (isset($apacheHeaders['authorization'])) {
+                return $apacheHeaders['authorization'];
+            }
+        }
+        
+        return null;
+    }
+}
+
+// -------------------
 // JWT Functions
 // -------------------
 if (!function_exists('generateToken')) {
@@ -57,30 +115,44 @@ if (!function_exists('verifyToken')) {
 // -------------------
 if (!function_exists('verifyAuth')) {
     function verifyAuth() {
-        $headers = getallheaders();
+        // Get authorization header using our helper function
+        $authHeader = getAuthorizationHeader();
         
-        if (!isset($headers['Authorization'])) {
+        error_log("=== Auth Verification ===");
+        error_log("Auth header found: " . ($authHeader ? 'YES' : 'NO'));
+        if ($authHeader) {
+            error_log("Auth header (first 30 chars): " . substr($authHeader, 0, 30));
+        }
+        
+        if (!$authHeader) {
+            error_log("No authorization header found");
             respond(['error' => 'No authorization header provided'], 401);
         }
 
-        $authHeader = $headers['Authorization'];
-        
-        if (!preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
-            respond(['error' => 'Invalid authorization header format'], 401);
+        // Extract token from Bearer format
+        if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+            $token = $matches[1];
+        } else {
+            // Maybe it's just the token without "Bearer"
+            $token = $authHeader;
         }
-
-        $token = $matches[1];
+        
+        error_log("Token extracted (first 30 chars): " . substr($token, 0, 30));
         
         try {
             $decoded = verifyToken($token);
             
+            error_log("Token verified successfully for user_id: " . $decoded['user_id']);
+            
+            // Store in $_GET for easy access in other scripts
             $_GET['user_id'] = $decoded['user_id'];
             $_GET['role'] = $decoded['role'];
             $_GET['institution_id'] = $decoded['institution_id'];
             
             return $decoded;
         } catch (Exception $e) {
-            respond(['error' => $e->getMessage()], 401);
+            error_log("Token verification failed: " . $e->getMessage());
+            respond(['error' => 'Invalid token: ' . $e->getMessage()], 401);
         }
     }
 }
@@ -121,7 +193,7 @@ if (!function_exists('getInput')) {
         $decoded = json_decode($input, true);
         
         // Log for debugging
-        error_log('Raw input: ' . $input);
+        error_log('Raw input: ' . substr($input, 0, 200));
         error_log('Decoded input: ' . json_encode($decoded));
         
         return $decoded ?? [];
