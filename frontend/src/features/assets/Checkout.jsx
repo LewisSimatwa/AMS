@@ -57,14 +57,22 @@ export default function CheckoutModule() {
       const res = await fetch("http://localhost:8000/available.php", {
         headers: { "Authorization": `Bearer ${token}` }
       });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
       const data = await res.json();
       if (data.error) {
         setError(data.error);
+        setAssets([]);
       } else {
-        setAssets(data);
+        setAssets(Array.isArray(data) ? data : []);
       }
     } catch (err) {
+      console.error("Failed to load assets:", err);
       setError("Failed to load assets");
+      setAssets([]);
     } finally {
       setLoading(false);
     }
@@ -78,42 +86,86 @@ export default function CheckoutModule() {
       const res = await fetch("http://localhost:8000/checked_out_assets.php", {
         headers: { "Authorization": `Bearer ${token}` }
       });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
       const data = await res.json();
       if (data.error) {
         setError(data.error);
+        setCheckedOutAssets([]);
       } else {
-        setCheckedOutAssets(data);
+        setCheckedOutAssets(Array.isArray(data) ? data : []);
       }
     } catch (err) {
+      console.error("Failed to load checked out assets:", err);
       setError("Failed to load checked out assets");
+      setCheckedOutAssets([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch users
+  // Fetch users - FIXED to call the correct endpoint with action parameter
   const fetchUsers = async () => {
     try {
-      const res = await fetch("http://localhost:8000/users.php", {
+      const res = await fetch("http://localhost:8000/users.php?action=list", {
         headers: { "Authorization": `Bearer ${token}` }
       });
+      
+      if (!res.ok) {
+        console.error("Failed to load users: HTTP", res.status);
+        setUsers([]);
+        return;
+      }
+      
       const data = await res.json();
-      if (!data.error) setUsers(data);
+      
+      // Check the response structure from your users.php
+      if (data.success && Array.isArray(data.users)) {
+        setUsers(data.users);
+      } else if (data.error) {
+        console.error("Error from API:", data.error);
+        setUsers([]);
+      } else {
+        console.error("Unexpected data format:", data);
+        setUsers([]);
+      }
     } catch (err) {
-      console.error("Failed to load users");
+      console.error("Failed to load users:", err);
+      setUsers([]);
     }
   };
 
-  // Fetch departments
+  // Fetch departments - FIXED to call the correct endpoint with action parameter
   const fetchDepartments = async () => {
     try {
-      const res = await fetch("http://localhost:8000/departments.php", {
+      const res = await fetch("http://localhost:8000/users.php?action=get_departments", {
         headers: { "Authorization": `Bearer ${token}` }
       });
+      
+      if (!res.ok) {
+        console.error("Failed to load departments: HTTP", res.status);
+        setDepartments([]);
+        return;
+      }
+      
       const data = await res.json();
-      if (!data.error) setDepartments(data);
+      
+      // Check the response structure from your users.php
+      if (data.success && Array.isArray(data.departments)) {
+        setDepartments(data.departments);
+      } else if (data.error) {
+        console.error("Error from API:", data.error);
+        setDepartments([]);
+      } else {
+        console.error("Unexpected data format:", data);
+        setDepartments([]);
+      }
     } catch (err) {
-      console.error("Failed to load departments");
+      console.error("Failed to load departments:", err);
+      setDepartments([]);
     }
   };
 
