@@ -196,7 +196,9 @@ export default function AssetRegistrationForm({ onAssetAdded }) {
             </div>
 
             <div className="form-group">
-              <label htmlFor="category">Category</label>
+              <label htmlFor="category">
+                Category <span className="required">*</span>
+              </label>
               <select
                 id="category"
                 name="category"

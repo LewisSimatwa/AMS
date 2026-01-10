@@ -4,6 +4,13 @@ body {
   overflow: hidden;
 }
 
+/* Ensure box-sizing for all login elements */
+.login-container *,
+.login-container *::before,
+.login-container *::after {
+  box-sizing: border-box;
+}
+
 /* Main Container */
 .login-container {
   height: 100vh;
@@ -220,13 +227,13 @@ body {
   display: block;
 }
 
-.input-group:focus-within .input-icon {
+.login-container .input-group:focus-within .input-icon {
   color: #2563eb;
 }
 
-.input-icon {
+.login-container .input-icon {
   position: absolute;
-  left: 0.75rem;
+  left: 1rem;
   top: 50%;
   transform: translateY(-50%);
   color: #9ca3af;
@@ -237,11 +244,13 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  width: 20px;
+  height: 20px;
 }
 
-.input-field {
+.login-container .input-field {
   width: 100%;
-  padding: 0.75rem 1rem 0.75rem 2.75rem;
+  padding: 0.75rem 1rem 0.75rem 3.5rem;
   border: 2px solid #e5e7eb;
   border-radius: 0.75rem;
   outline: none;
@@ -254,30 +263,39 @@ body {
   appearance: none;
 }
 
-.input-field-password {
-  padding-right: 3rem;
+.login-container .input-field-password {
+  padding-right: 3.5rem;
 }
 
-.input-field:focus {
+.login-container .input-field:focus {
   border-color: #3b82f6;
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
 }
 
-.input-field::placeholder {
+.login-container .input-field::placeholder {
   color: #9ca3af;
 }
 
 /* Select dropdown custom arrow */
-select.input-field {
+.login-container select.input-field {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  padding-right: 2.5rem;
+  background-position: right 1rem center;
+  padding-right: 3.5rem;
   cursor: pointer;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.login-container select.input-field option {
+  padding: 0.5rem;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 /* Password Toggle */
-.password-toggle {
+.login-container .password-toggle {
   position: absolute;
   right: 0.75rem;
   top: 50%;
@@ -294,7 +312,7 @@ select.input-field {
   z-index: 2;
 }
 
-.password-toggle:hover {
+.login-container .password-toggle:hover {
   color: #4b5563;
 }
 
