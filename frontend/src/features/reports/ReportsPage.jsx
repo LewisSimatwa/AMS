@@ -59,12 +59,12 @@ export default function Reports() {
         id: log.id,
         action: log.action,
         details: formatLogDetails(log),
-        username: log.performed_by || "System",
-        created_at: log.timestamp,
+        username: log.username || "System",
+        created_at: log.created_at,
         entity_type: log.entity_type,
         entity_id: log.entity_id,
-        old_value: log.old_value,
-        new_value: log.new_value,
+        old_value: log.old_values,
+        new_value: log.new_values,
         institution_name: log.institution_name
       }));
 

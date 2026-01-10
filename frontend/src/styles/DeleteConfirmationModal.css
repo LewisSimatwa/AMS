@@ -3,8 +3,8 @@
 }
 
 .modal-header .warning-icon {
-  width: 64px;
-  height: 64px;
+  width: 40px;
+  height: 40px;
   margin: 0 auto 16px;
   background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
   border-radius: 50%;
@@ -18,7 +18,7 @@
   background-color: #fef2f2;
   border: 1px solid #fecaca;
   border-radius: 8px;
-  padding: 16px;
+  padding: 6px;
   margin-bottom: 20px;
 }
 
@@ -61,7 +61,7 @@
 }
 
 .confirmation-input {
-  margin-top: 20px;
+  margin-top: 10px;
 }
 
 .confirmation-input label {
@@ -78,7 +78,7 @@
 
 .confirmation-input input {
   width: 100%;
-  padding: 10px 14px;
+  padding: 1px 2px;
   border: 2px solid #d1d5db;
   border-radius: 6px;
   font-size: 1rem;
