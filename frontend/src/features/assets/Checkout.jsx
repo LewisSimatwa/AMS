@@ -34,7 +34,12 @@ export default function CheckoutModule() {
     remarks: ""
   });
 
-  const token = localStorage.getItem('token');
+  // Get token from localStorage
+  const getToken = () => {
+    const token = localStorage.getItem('token');
+    console.log('Token retrieved:', token ? 'exists' : 'missing');
+    return token;
+  };
 
   // Fetch data based on active tab
   useEffect(() => {
@@ -53,16 +58,31 @@ export default function CheckoutModule() {
   const fetchAvailableAssets = async () => {
     setLoading(true);
     setError("");
+    const token = getToken();
+    
+    if (!token) {
+      setError("No authentication token found. Please log in.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch("http://localhost:8000/available.php", {
-        headers: { "Authorization": `Bearer ${token}` }
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
       });
+      
+      console.log('Available assets response status:', res.status);
       
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
       
       const data = await res.json();
+      console.log('Available assets data:', data);
+      
       if (data.error) {
         setError(data.error);
         setAssets([]);
@@ -71,7 +91,7 @@ export default function CheckoutModule() {
       }
     } catch (err) {
       console.error("Failed to load assets:", err);
-      setError("Failed to load assets");
+      setError("Failed to load assets: " + err.message);
       setAssets([]);
     } finally {
       setLoading(false);
@@ -82,16 +102,31 @@ export default function CheckoutModule() {
   const fetchCheckedOutAssets = async () => {
     setLoading(true);
     setError("");
+    const token = getToken();
+    
+    if (!token) {
+      setError("No authentication token found. Please log in.");
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch("http://localhost:8000/checked_out_assets.php", {
-        headers: { "Authorization": `Bearer ${token}` }
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
       });
+      
+      console.log('Checked out assets response status:', res.status);
       
       if (!res.ok) {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
       
       const data = await res.json();
+      console.log('Checked out assets data:', data);
+      
       if (data.error) {
         setError(data.error);
         setCheckedOutAssets([]);
@@ -100,71 +135,126 @@ export default function CheckoutModule() {
       }
     } catch (err) {
       console.error("Failed to load checked out assets:", err);
-      setError("Failed to load checked out assets");
+      setError("Failed to load checked out assets: " + err.message);
       setCheckedOutAssets([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch users - FIXED to call the correct endpoint with action parameter
+  // Fetch users
   const fetchUsers = async () => {
+    const token = getToken();
+    
+    if (!token) {
+      console.error("No token found when fetching users");
+      setError("No authentication token found. Please log in.");
+      setUsers([]);
+      return;
+    }
+
+    console.log('Fetching users with token...');
+    
     try {
-      const res = await fetch("http://localhost:8000/users.php?action=list", {
-        headers: { "Authorization": `Bearer ${token}` }
+      const url = "http://localhost:8000/user_list.php";
+      console.log('Fetching from URL:', url);
+      
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
       });
       
+      console.log('Users response status:', res.status);
+      console.log('Users response headers:', Object.fromEntries(res.headers.entries()));
+      
       if (!res.ok) {
-        console.error("Failed to load users: HTTP", res.status);
+        const errorText = await res.text();
+        console.error("Users fetch failed. Status:", res.status, "Response:", errorText);
+        setError(`Failed to load users (HTTP ${res.status})`);
         setUsers([]);
         return;
       }
       
       const data = await res.json();
+      console.log('Users response data:', data);
       
-      // Check the response structure from your users.php
+      // Check the response structure
       if (data.success && Array.isArray(data.users)) {
+        console.log(`Loaded ${data.users.length} users`);
         setUsers(data.users);
       } else if (data.error) {
         console.error("Error from API:", data.error);
+        setError(data.error);
         setUsers([]);
       } else {
         console.error("Unexpected data format:", data);
+        setError("Unexpected response format from server");
         setUsers([]);
       }
     } catch (err) {
       console.error("Failed to load users:", err);
+      setError("Failed to load users: " + err.message);
       setUsers([]);
     }
   };
 
-  // Fetch departments - FIXED to call the correct endpoint with action parameter
+  // Fetch departments - Updated to use new departments.php endpoint
   const fetchDepartments = async () => {
+    const token = getToken();
+    
+    if (!token) {
+      console.error("No token found when fetching departments");
+      setError("No authentication token found. Please log in.");
+      setDepartments([]);
+      return;
+    }
+    
+    console.log('Fetching departments with token...');
+    
     try {
-      const res = await fetch("http://localhost:8000/users.php?action=get_departments", {
-        headers: { "Authorization": `Bearer ${token}` }
+      const url = "http://localhost:8000/departments.php";
+      console.log('Fetching from URL:', url);
+      
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
       });
       
+      console.log('Departments response status:', res.status);
+      
       if (!res.ok) {
-        console.error("Failed to load departments: HTTP", res.status);
+        const errorText = await res.text();
+        console.error("Departments fetch failed. Status:", res.status, "Response:", errorText);
+        setError(`Failed to load departments (HTTP ${res.status})`);
         setDepartments([]);
         return;
       }
       
       const data = await res.json();
+      console.log('Departments response data:', data);
       
-      // Check the response structure from your users.php
+      // Check the response structure
       if (data.success && Array.isArray(data.departments)) {
+        console.log(`Loaded ${data.departments.length} departments`);
         setDepartments(data.departments);
       } else if (data.error) {
         console.error("Error from API:", data.error);
+        setError(data.error);
         setDepartments([]);
       } else {
         console.error("Unexpected data format:", data);
+        setError("Unexpected response format from server");
         setDepartments([]);
       }
     } catch (err) {
       console.error("Failed to load departments:", err);
+      setError("Failed to load departments: " + err.message);
       setDepartments([]);
     }
   };
@@ -175,6 +265,7 @@ export default function CheckoutModule() {
     setLoading(true);
     setError("");
     setSuccess("");
+    const token = getToken();
 
     try {
       const res = await fetch("http://localhost:8000/checkout.php", {
@@ -201,7 +292,7 @@ export default function CheckoutModule() {
         fetchAvailableAssets();
       }
     } catch (err) {
-      setError("Failed to checkout asset");
+      setError("Failed to checkout asset: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -213,6 +304,7 @@ export default function CheckoutModule() {
     setLoading(true);
     setError("");
     setSuccess("");
+    const token = getToken();
 
     try {
       const res = await fetch("http://localhost:8000/checkin.php", {
@@ -238,7 +330,7 @@ export default function CheckoutModule() {
         fetchCheckedOutAssets();
       }
     } catch (err) {
-      setError("Failed to checkin asset");
+      setError("Failed to checkin asset: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -250,6 +342,7 @@ export default function CheckoutModule() {
     setLoading(true);
     setError("");
     setSuccess("");
+    const token = getToken();
 
     try {
       const res = await fetch("http://localhost:8000/transfer.php", {
@@ -276,7 +369,7 @@ export default function CheckoutModule() {
         fetchAvailableAssets();
       }
     } catch (err) {
-      setError("Failed to transfer asset");
+      setError("Failed to transfer asset: " + err.message);
     } finally {
       setLoading(false);
     }

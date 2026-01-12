@@ -2,7 +2,7 @@ import { useState } from "react";
 import AssetTable from "./AssetsTable";
 import AssetDetail from "./AssetsDetails";
 import AssetRegistrationForm from "./AssetsRegistrationForm";
-import DeleteConfirmationModal from "./DeleteConfirmationModal";
+import RetireAsset from "./RetireAsset";
 import "../../styles/Assets.css";
 
 export default function AssetsDetails() {
@@ -20,8 +20,8 @@ export default function AssetsDetails() {
     setActiveModal(null);
   }
 
-  function handleDeleteComplete() {
-    // Trigger refresh after deletion
+  function handleRetireComplete() {
+    // Trigger refresh after retirement
     setRefreshTrigger((prev) => prev + 1);
     closeModal();
   }
@@ -42,7 +42,7 @@ export default function AssetsDetails() {
 
       <AssetTable
         onView={(asset) => openModal("detail", asset)}
-        onDelete={(asset) => openModal("delete", asset)}
+        onRetire={(asset) => openModal("retire", asset)}
         refreshTrigger={refreshTrigger}
       />
 
@@ -51,11 +51,11 @@ export default function AssetsDetails() {
         <AssetDetail asset={selectedAsset} onClose={closeModal} />
       )}
 
-      {activeModal === "delete" && selectedAsset && (
-        <DeleteConfirmationModal
+      {activeModal === "retire" && selectedAsset && (
+        <RetireAsset
           asset={selectedAsset}
           onClose={closeModal}
-          onConfirm={handleDeleteComplete}
+          onConfirm={handleRetireComplete}
         />
       )}
     </div>

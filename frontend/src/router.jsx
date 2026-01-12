@@ -13,6 +13,7 @@ import Maintenance from "./features/maintenance/Maintenance";
 import AuditLogs from "./features/audit/AuditLogs";
 import ProtectedRoute from "./components/ProtectedRoute";
 import CheckOut from "./features/assets/Checkout";
+import RetireAsset from "./features/assets/RetireAsset";
 
 
 export default function AppRouter() {

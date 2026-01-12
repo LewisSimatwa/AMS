@@ -302,3 +302,188 @@
   display: flex;
   justify-content: flex-end;
 }
+
+
+/* RetireAsset.css */
+
+.retire-modal {
+  max-width: 600px;
+  width: 90%;
+}
+
+.retire-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  color: white;
+  animation: pulse-retire 2s ease-in-out infinite;
+}
+
+@keyframes pulse-retire {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+  }
+}
+
+.info-message {
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  border-left: 4px solid #f59e0b;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.info-message p {
+  margin: 0 0 0.5rem 0;
+  color: #92400e;
+  font-size: 0.95rem;
+}
+
+.info-message p:last-child {
+  margin-bottom: 0;
+}
+
+.info-message ul {
+  margin: 0.5rem 0 0 0;
+  padding-left: 1.5rem;
+  color: #78350f;
+}
+
+.info-message li {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.retirement-reason-input {
+  margin: 1.5rem 0;
+}
+
+.retirement-reason-input label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.label-hint {
+  display: block;
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: normal;
+  margin-top: 0.25rem;
+}
+
+.retirement-reason-input textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 100px;
+  transition: all 0.2s;
+}
+
+.retirement-reason-input textarea:focus {
+  outline: none;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+}
+
+.retirement-reason-input textarea:disabled {
+  background: #f3f4f6;
+  cursor: not-allowed;
+}
+
+.char-count {
+  display: block;
+  text-align: right;
+  margin-top: 0.5rem;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.btn-retire-confirm {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+  font-size: 1rem;
+}
+
+.btn-retire-confirm:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.btn-retire-confirm:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-retire-confirm:disabled {
+  background: #d1d5db;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-retire-confirm svg {
+  flex-shrink: 0;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .retire-modal {
+    width: 95%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  .retire-icon {
+    width: 56px;
+    height: 56px;
+  }
+  
+  .retire-icon svg {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .modal-header h2 {
+    font-size: 1.25rem;
+  }
+}

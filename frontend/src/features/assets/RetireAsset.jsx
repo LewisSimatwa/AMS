@@ -1,18 +1,30 @@
 import { useState } from "react";
-import "../../styles/DeleteConfirmationModal.css";
+import "../../styles/RetireAsset.css";
 
-export default function DeleteConfirmationModal({ asset, onClose, onConfirm }) {
+export default function RetireAsset({ asset, onClose, onConfirm }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [confirmText, setConfirmText] = useState("");
+  const [retirementReason, setRetirementReason] = useState("");
 
   const token = localStorage.getItem("token");
   const institutionId = localStorage.getItem("institutionId");
 
-  async function handleDelete() {
+  async function handleRetire() {
     // Validate confirmation text
     if (confirmText !== asset.asset_code) {
       setError("Asset code does not match");
+      return;
+    }
+
+    // Validate retirement reason
+    if (!retirementReason.trim()) {
+      setError("Please provide a retirement reason");
+      return;
+    }
+
+    if (retirementReason.trim().length < 10) {
+      setError("Retirement reason must be at least 10 characters");
       return;
     }
 
@@ -26,15 +38,13 @@ export default function DeleteConfirmationModal({ asset, onClose, onConfirm }) {
     setError("");
 
     try {
-      console.log("=== DELETE REQUEST START ===");
+      console.log("=== RETIRE ASSET REQUEST START ===");
       console.log("Asset ID:", asset.id);
       console.log("Asset Code:", asset.asset_code);
-      console.log("URL:", `http://localhost:8000/api/delete_asset.php?id=${asset.id}`);
-      console.log("Token exists:", !!token);
-      console.log("Institution ID:", institutionId);
+      console.log("Retirement Reason:", retirementReason);
       
       const response = await fetch(
-        `http://localhost:8000/api/delete_asset.php?id=${asset.id}`,
+        "http://localhost:8000/retire_asset.php",
         {
           method: "POST",
           headers: {
@@ -43,71 +53,48 @@ export default function DeleteConfirmationModal({ asset, onClose, onConfirm }) {
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            _method: "DELETE",
-            asset_id: asset.id
+            asset_id: asset.id,
+            retirement_reason: retirementReason.trim()
           })
         }
       );
 
       console.log("Response status:", response.status);
-      console.log("Response ok:", response.ok);
-      console.log("Response headers:", {
-        contentType: response.headers.get('content-type'),
-        contentLength: response.headers.get('content-length')
-      });
       
-      // Get response as text first to see what we're getting
       const rawText = await response.text();
-      console.log("Raw response text:", rawText);
-      console.log("Response length:", rawText.length);
+      console.log("Raw response:", rawText);
 
-      // Check if response is empty
       if (!rawText || rawText.trim().length === 0) {
-        console.error("Empty response received");
-        throw new Error("Server returned empty response. Check PHP error log.");
+        throw new Error("Server returned empty response");
       }
 
-      // Try to parse as JSON
       let data;
       try {
         data = JSON.parse(rawText);
-        console.log("Parsed JSON data:", data);
+        console.log("Parsed data:", data);
       } catch (parseError) {
         console.error("JSON parse error:", parseError);
-        console.error("Response was:", rawText.substring(0, 500));
-        throw new Error(`Server returned invalid JSON. Response: ${rawText.substring(0, 200)}`);
+        throw new Error(`Invalid server response: ${rawText.substring(0, 200)}`);
       }
 
-      // Check for errors in response
       if (!response.ok) {
-        const errorMsg = data.error || `Server error: ${response.status}`;
-        console.error("Server error:", errorMsg);
-        throw new Error(errorMsg);
+        throw new Error(data.error || `Server error: ${response.status}`);
       }
 
-      // Check if deletion was successful
       if (!data.success) {
-        const errorMsg = data.error || "Failed to delete asset";
-        console.error("Deletion failed:", errorMsg);
-        throw new Error(errorMsg);
+        throw new Error(data.error || "Failed to retire asset");
       }
 
-      console.log("=== DELETE SUCCESS ===");
-      console.log("Deleted asset:", data.deleted_asset);
+      console.log("=== RETIREMENT SUCCESS ===");
       
-      // Show success message
-      alert(`✓ Asset "${asset.name}" (${asset.asset_code}) deleted successfully`);
+      alert(`✓ Asset "${asset.name}" (${asset.asset_code}) has been retired successfully`);
       
-      // Close modal and refresh list
       onConfirm();
       
     } catch (err) {
-      console.error("=== DELETE ERROR ===");
-      console.error("Error type:", err.name);
-      console.error("Error message:", err.message);
-      console.error("Full error:", err);
-      
-      setError(err.message || "Failed to delete asset. Check console for details.");
+      console.error("=== RETIREMENT ERROR ===");
+      console.error("Error:", err);
+      setError(err.message || "Failed to retire asset. Check console for details.");
     } finally {
       setLoading(false);
     }
@@ -115,14 +102,15 @@ export default function DeleteConfirmationModal({ asset, onClose, onConfirm }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-container delete-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-container retire-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <div className="warning-icon">
+          <div className="retire-icon">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 8v4m0 4h.01"/>
             </svg>
           </div>
-          <h2>Delete Asset</h2>
+          <h2>Retire Asset</h2>
           <button 
             className="modal-close" 
             onClick={onClose}
@@ -134,16 +122,18 @@ export default function DeleteConfirmationModal({ asset, onClose, onConfirm }) {
         </div>
 
         <div className="modal-body">
-          <div className="warning-message">
-            <p><strong>Warning:</strong> This action cannot be undone!</p>
-            <p>You are about to permanently delete this asset:</p>
+          <div className="info-message">
+            <p><strong>Note:</strong> This will mark the asset as retired and make it read-only.</p>
+            <p>Retired assets:</p>
+            <ul>
+              <li>Cannot be checked out or checked in</li>
+              <li>Will be marked with retirement date and reason</li>
+              <li>Will still appear in reports and audit logs</li>
+              <li>Can only be modified by administrators</li>
+            </ul>
           </div>
 
           <div className="asset-info">
-            <div className="info-row">
-              <span className="label">Asset ID:</span>
-              <span className="value">{asset.id}</span>
-            </div>
             <div className="info-row">
               <span className="label">Asset Code:</span>
               <span className="value">{asset.asset_code}</span>
@@ -157,7 +147,7 @@ export default function DeleteConfirmationModal({ asset, onClose, onConfirm }) {
               <span className="value">{asset.category || "—"}</span>
             </div>
             <div className="info-row">
-              <span className="label">Status:</span>
+              <span className="label">Current Status:</span>
               <span className={`status-badge ${asset.status}`}>
                 {asset.status?.replace("_", " ")}
               </span>
@@ -171,15 +161,37 @@ export default function DeleteConfirmationModal({ asset, onClose, onConfirm }) {
               </svg>
               <div>
                 <strong>Error:</strong> {error}
-                <br />
-                <small>Check browser console (F12) for details</small>
               </div>
             </div>
           )}
 
+          <div className="retirement-reason-input">
+            <label htmlFor="retirementReason">
+              <strong>Retirement Reason *</strong>
+              <span className="label-hint">Explain why this asset is being retired</span>
+            </label>
+            <textarea
+              id="retirementReason"
+              rows="4"
+              placeholder="e.g., End of useful life, irreparable damage, obsolete technology, replaced by newer model..."
+              value={retirementReason}
+              onChange={(e) => {
+                setRetirementReason(e.target.value);
+                setError("");
+              }}
+              disabled={loading}
+              maxLength={500}
+            />
+            <small className="char-count">
+              {retirementReason.length}/500 characters
+              {retirementReason.length < 10 && retirementReason.length > 0 && 
+                " (minimum 10 characters)"}
+            </small>
+          </div>
+
           <div className="confirmation-input">
             <label htmlFor="confirmText">
-              To confirm deletion, type the asset code <strong>{asset.asset_code}</strong>
+              To confirm retirement, type the asset code <strong>{asset.asset_code}</strong>
             </label>
             <input
               id="confirmText"
@@ -207,21 +219,22 @@ export default function DeleteConfirmationModal({ asset, onClose, onConfirm }) {
           </button>
           <button
             type="button"
-            onClick={handleDelete}
-            disabled={loading || confirmText !== asset.asset_code}
-            className="btn-delete-confirm"
+            onClick={handleRetire}
+            disabled={loading || confirmText !== asset.asset_code || !retirementReason.trim()}
+            className="btn-retire-confirm"
           >
             {loading ? (
               <>
                 <span className="spinner"></span>
-                Deleting...
+                Retiring...
               </>
             ) : (
               <>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                  <path fillRule="evenodd" d="M5 3V1h6v2h4v2H1V3h4zm2 0h2V2H7v1zm7 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V6h12z"/>
+                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                  <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0zM7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 4.995z"/>
                 </svg>
-                Delete Asset
+                Retire Asset
               </>
             )}
           </button>
