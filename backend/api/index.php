@@ -2,6 +2,7 @@
 require 'config.php';
 require 'helpers.php';
 
+
 // Headers
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: http://localhost:5173');

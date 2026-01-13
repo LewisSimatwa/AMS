@@ -1,105 +1,226 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { TrendingUp, TrendingDown, Users, Package } from "lucide-react";
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Users, 
+  Package,
+  AlertTriangle,
+  Wrench,
+  BarChart3,
+  RefreshCw
+} from "lucide-react";
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts';
 import "../../styles/Analytics.css";
+
+const RISK_COLORS = {
+  LOW: '#10b981',
+  MEDIUM: '#f59e0b',
+  HIGH: '#ef4444'
+};
 
 export default function Analytics() {
   const navigate = useNavigate();
   const [timeRange, setTimeRange] = useState("week");
+  const [activeTab, setActiveTab] = useState("overview");
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState("");
+  
+  // Basic stats
   const [stats, setStats] = useState({
     totalAssets: 0,
     assetsInUse: 0,
     assetsInRepair: 0,
     totalUsers: 0,
+    highRisk: 0,
+    mediumRisk: 0,
+    lowRisk: 0,
   });
-  const [riskScores, setRiskScores] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+
+  // Analytics data
+  const [dashboardData, setDashboardData] = useState(null);
+  const [selectedAsset, setSelectedAsset] = useState(null);
+  const [assetDetails, setAssetDetails] = useState(null);
 
   const token = localStorage.getItem("token");
   const institutionId = localStorage.getItem("institutionId");
+
+  // API Base URLs
+  const BACKEND_URL = "http://localhost:8000/api";
+  const ANALYTICS_URL = "http://localhost:5001/api/analytics";
 
   useEffect(() => {
     if (!token || !institutionId) {
       navigate("/login");
       return;
     }
-
-    fetchAnalyticsData();
+    fetchAllData();
   }, [token, institutionId, timeRange]);
 
-  async function fetchAnalyticsData() {
+  const getHeaders = () => ({
+    Authorization: `Bearer ${token}`,
+    "X-Institution-ID": institutionId,
+    "Content-Type": "application/json",
+  });
+
+  async function fetchAllData() {
     setLoading(true);
     setError("");
 
     try {
-      const headers = {
-        Authorization: `Bearer ${token}`,
-        "X-Institution-ID": institutionId,
-      };
-
-      // Fetch assets
-      const assetsRes = await fetch(
-        `http://localhost:8000/api/assets?institution_id=${institutionId}`,
-        { headers }
-      );
-
-      if (!assetsRes.ok) throw new Error("Failed to fetch assets");
-
-      const assetsData = await assetsRes.json();
-      const assets = assetsData.assets || [];
-
-      // Calculate stats
-      const inUse = assets.filter((a) => a.status === "on_loan").length;
-      const inRepair = assets.filter((a) => a.status === "maintenance").length;
-
-      // Fetch risk scores
-      let scores = [];
-      try {
-        const riskRes = await fetch(
-          `http://localhost:8000/api/analytics/risk-scores?institution_id=${institutionId}`,
-          { headers }
-        );
-
-        if (riskRes.ok) {
-          const riskData = await riskRes.json();
-          scores = riskData.scores || [];
-        }
-      } catch (err) {
-        console.warn("Risk scores not available");
-      }
-
-      // Fetch users count (if you have a users endpoint)
-      let userCount = 0;
-      try {
-        const usersRes = await fetch(
-          `http://localhost:8000/api/users?institution_id=${institutionId}`,
-          { headers }
-        );
-
-        if (usersRes.ok) {
-          const usersData = await usersRes.json();
-          userCount = usersData.users?.length || 0;
-        }
-      } catch (err) {
-        console.warn("Users data not available");
-      }
-
-      setStats({
-        totalAssets: assets.length,
-        assetsInUse: inUse,
-        assetsInRepair: inRepair,
-        totalUsers: userCount,
-      });
-
-      setRiskScores(scores);
+      await Promise.all([
+        fetchBasicStats(),
+        fetchAnalyticsDashboard()
+      ]);
     } catch (err) {
-      console.error("Analytics error:", err);
+      console.error("Error fetching data:", err);
       setError(err.message || "Failed to load analytics data");
     } finally {
       setLoading(false);
     }
   }
+
+  async function fetchBasicStats() {
+    const headers = getHeaders();
+
+    // Fetch assets
+    const assetsRes = await fetch(
+      `${BACKEND_URL}/assets?institution_id=${institutionId}`,
+      { headers }
+    );
+
+    if (!assetsRes.ok) throw new Error("Failed to fetch assets");
+
+    const assetsData = await assetsRes.json();
+    const assets = assetsData.assets || [];
+
+    // Calculate basic stats
+    const inUse = assets.filter((a) => a.status === "on_loan").length;
+    const inRepair = assets.filter((a) => a.status === "maintenance").length;
+
+    // Fetch users count
+    let userCount = 0;
+    try {
+      const usersRes = await fetch(
+        `${BACKEND_URL}/users?institution_id=${institutionId}`,
+        { headers }
+      );
+      if (usersRes.ok) {
+        const usersData = await usersRes.json();
+        userCount = usersData.users?.length || 0;
+      }
+    } catch (err) {
+      console.warn("Users data not available");
+    }
+
+    // Fetch risk summary
+    let highRisk = 0, mediumRisk = 0, lowRisk = 0;
+    try {
+      const riskRes = await fetch(
+        `${BACKEND_URL}/analytics/summary?institution_id=${institutionId}`,
+        { headers }
+      );
+      if (riskRes.ok) {
+        const riskData = await riskRes.json();
+        if (riskData.success && riskData.summary) {
+          highRisk = riskData.summary.high_risk || 0;
+          mediumRisk = riskData.summary.medium_risk || 0;
+          lowRisk = riskData.summary.low_risk || 0;
+        }
+      }
+    } catch (err) {
+      console.warn("Risk summary not available");
+    }
+
+    setStats({
+      totalAssets: assets.length,
+      assetsInUse: inUse,
+      assetsInRepair: inRepair,
+      totalUsers: userCount,
+      highRisk,
+      mediumRisk,
+      lowRisk,
+    });
+  }
+
+  async function fetchAnalyticsDashboard() {
+    try {
+      const response = await fetch(`${ANALYTICS_URL}/dashboard/${institutionId}`);
+      
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setDashboardData(result.data);
+        }
+      }
+    } catch (err) {
+      console.warn("Analytics dashboard not available:", err);
+    }
+  }
+
+  async function runPredictiveAnalysis() {
+    setProcessing(true);
+    try {
+      // Extract features
+      const featuresRes = await fetch(
+        `${ANALYTICS_URL}/extract-features/${institutionId}`,
+        { method: 'POST' }
+      );
+      const featuresData = await featuresRes.json();
+      
+      if (!featuresData.success) {
+        throw new Error('Feature extraction failed');
+      }
+
+      // Calculate risks
+      const risksRes = await fetch(
+        `${ANALYTICS_URL}/calculate-risks/${institutionId}`,
+        { method: 'POST' }
+      );
+      const risksData = await risksRes.json();
+      
+      if (!risksData.success) {
+        throw new Error('Risk calculation failed');
+      }
+
+      alert(`Analysis complete! Processed ${risksData.risks_calculated} assets.`);
+      
+      // Refresh data
+      await fetchAllData();
+    } catch (err) {
+      console.error("Analysis error:", err);
+      alert("Failed to run analysis: " + err.message);
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  async function fetchAssetDetails(assetId) {
+    try {
+      const response = await fetch(`${ANALYTICS_URL}/asset-details/${assetId}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setAssetDetails(result.data);
+        setSelectedAsset(assetId);
+      }
+    } catch (err) {
+      console.error("Error fetching asset details:", err);
+    }
+  }
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const getRiskBadgeClass = (level) => {
+    return `risk-badge risk-${level?.toLowerCase() || 'unknown'}`;
+  };
 
   const statsCards = [
     {
@@ -115,23 +236,26 @@ export default function Analytics() {
       color: "#10b981",
     },
     {
-      title: "Assets in Repair",
-      value: stats.assetsInRepair,
-      icon: <TrendingDown />,
+      title: "High Risk Assets",
+      value: stats.highRisk,
+      icon: <AlertTriangle />,
       color: "#ef4444",
     },
     {
-      title: "Total Users",
-      value: stats.totalUsers,
-      icon: <Users />,
-      color: "#8b5cf6",
+      title: "In Maintenance",
+      value: stats.assetsInRepair,
+      icon: <Wrench />,
+      color: "#f59e0b",
     },
   ];
 
   if (loading) {
     return (
       <div className="analytics-page">
-        <div className="loading-spinner">Loading analytics...</div>
+        <div className="loading-spinner">
+          <div className="spinner"></div>
+          <p>Loading analytics...</p>
+        </div>
       </div>
     );
   }
@@ -139,45 +263,54 @@ export default function Analytics() {
   return (
     <div className="analytics-page">
       <div className="analytics-header">
-        <h1>Analytics Dashboard</h1>
-        <p>Overview of asset and user statistics</p>
+        <div>
+          <h1>Predictive Analytics Dashboard</h1>
+          <p>AI-powered insights and asset risk analysis</p>
+        </div>
+        <div className="header-actions">
+          <button 
+            onClick={runPredictiveAnalysis} 
+            disabled={processing}
+            className="btn-primary"
+          >
+            {processing ? (
+              <>
+                <RefreshCw className="spinning" size={16} />
+                Processing...
+              </>
+            ) : (
+              <>
+                <BarChart3 size={16} />
+                Run Analysis
+              </>
+            )}
+          </button>
+          <button onClick={fetchAllData} className="btn-secondary">
+            <RefreshCw size={16} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error && (
         <div className="error-banner">
           <p>{error}</p>
-          <button onClick={fetchAnalyticsData}>Retry</button>
+          <button onClick={fetchAllData}>Retry</button>
         </div>
       )}
 
-      <div className="time-range">
-        <button
-          className={timeRange === "week" ? "active" : ""}
-          onClick={() => setTimeRange("week")}
-        >
-          This Week
-        </button>
-        <button
-          className={timeRange === "month" ? "active" : ""}
-          onClick={() => setTimeRange("month")}
-        >
-          This Month
-        </button>
-        <button
-          className={timeRange === "year" ? "active" : ""}
-          onClick={() => setTimeRange("year")}
-        >
-          This Year
-        </button>
-      </div>
-
-      <div className="stats-cards">
+      {/* Stats Cards */}
+      <div className="stats-grid">
         {statsCards.map((stat) => (
-          <div key={stat.title} className="card" style={{ borderLeft: `4px solid ${stat.color}` }}>
-            <div className="card-icon" style={{ color: stat.color }}>
+          <div 
+            key={stat.title} 
+            className="stat-card" 
+            style={{ borderLeftColor: stat.color }}
+          >
+            <div className="stat-icon" style={{ color: stat.color }}>
               {stat.icon}
             </div>
-            <div className="card-info">
+            <div className="stat-content">
               <h2>{stat.value}</h2>
               <p>{stat.title}</p>
             </div>
@@ -185,34 +318,321 @@ export default function Analytics() {
         ))}
       </div>
 
-      {/* Risk Scores Table */}
-      {riskScores.length > 0 && (
-        <div className="risk-scores-section">
-          <h2>Risk Analysis</h2>
-          <table className="risk-table">
-            <thead>
-              <tr>
-                <th>Asset Code</th>
-                <th>Asset Name</th>
-                <th>Risk Level</th>
-                <th>Risk Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {riskScores.slice(0, 10).map((asset) => (
-                <tr key={asset.id}>
-                  <td>{asset.asset_code}</td>
-                  <td>{asset.name}</td>
-                  <td>
-                    <span className={`risk-badge ${asset.risk_level?.toLowerCase()}`}>
-                      {asset.risk_level}
+      {/* Tabs */}
+      <div className="analytics-tabs">
+        <button
+          className={activeTab === 'overview' ? 'tab active' : 'tab'}
+          onClick={() => setActiveTab('overview')}
+        >
+          Overview
+        </button>
+        <button
+          className={activeTab === 'risks' ? 'tab active' : 'tab'}
+          onClick={() => setActiveTab('risks')}
+        >
+          Risk Analysis
+        </button>
+        <button
+          className={activeTab === 'maintenance' ? 'tab active' : 'tab'}
+          onClick={() => setActiveTab('maintenance')}
+        >
+          Maintenance Forecast
+        </button>
+        <button
+          className={activeTab === 'usage' ? 'tab active' : 'tab'}
+          onClick={() => setActiveTab('usage')}
+        >
+          Usage Patterns
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      <div className="tab-content">
+        {activeTab === 'overview' && (
+          <div className="overview-tab">
+            {dashboardData && (
+              <div className="charts-grid">
+                {/* Risk Distribution Chart */}
+                <div className="chart-card">
+                  <h3>Risk Distribution</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={dashboardData.risk_distribution || []}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="risk_level" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="count" fill="#3b82f6">
+                        {dashboardData.risk_distribution?.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={RISK_COLORS[entry.risk_level]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Condition Breakdown Chart */}
+                <div className="chart-card">
+                  <h3>Asset Condition</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={dashboardData.condition_breakdown || []}
+                        dataKey="count"
+                        nameKey="condition"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        label
+                      >
+                        {dashboardData.condition_breakdown?.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={
+                              entry.condition === 'good' ? '#10b981' : 
+                              entry.condition === 'fair' ? '#f59e0b' : 
+                              '#ef4444'
+                            } 
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'risks' && (
+          <div className="risks-tab">
+            <h2>High Risk Assets</h2>
+            <p className="tab-description">
+              Assets requiring immediate attention based on predictive analysis
+            </p>
+            
+            <div className="asset-list">
+              {dashboardData?.high_risk_assets?.length > 0 ? (
+                dashboardData.high_risk_assets.map(asset => (
+                  <div 
+                    key={asset.id} 
+                    className="asset-card"
+                    onClick={() => fetchAssetDetails(asset.id)}
+                  >
+                    <div className="asset-header">
+                      <div>
+                        <h4>{asset.name}</h4>
+                        <p className="asset-code">{asset.asset_code}</p>
+                      </div>
+                      <span className={getRiskBadgeClass(asset.risk_level)}>
+                        {asset.risk_level}
+                      </span>
+                    </div>
+                    <div className="asset-details">
+                      <div className="detail-item">
+                        <span className="label">Risk Score:</span>
+                        <span className="value">{(asset.risk_score * 100).toFixed(1)}%</span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="label">Department:</span>
+                        <span className="value">{asset.department || 'N/A'}</span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="label">Condition:</span>
+                        <span className={`value condition-${asset.condition}`}>
+                          {asset.condition}
+                        </span>
+                      </div>
+                      {asset.predicted_failure_date && (
+                        <div className="detail-item">
+                          <span className="label">Predicted Failure:</span>
+                          <span className="value warning">
+                            {formatDate(asset.predicted_failure_date)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="no-data">No high-risk assets found. Run analysis to generate predictions.</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'maintenance' && (
+          <div className="maintenance-tab">
+            <h2>Maintenance Forecast (Next 30 Days)</h2>
+            <p className="tab-description">
+              Assets predicted to require maintenance soon
+            </p>
+            
+            <div className="forecast-list">
+              {dashboardData?.maintenance_forecast?.length > 0 ? (
+                dashboardData.maintenance_forecast.map(asset => (
+                  <div key={asset.id} className="forecast-item">
+                    <div className="forecast-date">
+                      <div className="date-badge">
+                        {formatDate(asset.predicted_failure_date)}
+                      </div>
+                    </div>
+                    <div className="forecast-details">
+                      <h4>{asset.name}</h4>
+                      <p className="asset-code">{asset.asset_code}</p>
+                      <div className="risk-indicator">
+                        <span>Risk Score: {(asset.risk_score * 100).toFixed(1)}%</span>
+                      </div>
+                    </div>
+                    <div className="forecast-actions">
+                      <button 
+                        className="btn-sm btn-primary"
+                        onClick={() => fetchAssetDetails(asset.id)}
+                      >
+                        View Details
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="no-data">No maintenance predicted in the next 30 days</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'usage' && (
+          <div className="usage-tab">
+            <h2>Asset Usage Patterns</h2>
+            <p className="tab-description">
+              Most frequently used assets (last 90 days)
+            </p>
+            
+            {dashboardData?.usage_patterns?.length > 0 && (
+              <>
+                <div className="chart-card">
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart 
+                      data={dashboardData.usage_patterns} 
+                      layout="horizontal"
+                      margin={{ left: 20, right: 20 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis type="category" dataKey="asset_code" width={120} />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="usage_count" fill="#3b82f6" name="Usage Count" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="usage-list">
+                  {dashboardData.usage_patterns.map(asset => (
+                    <div key={asset.id} className="usage-item">
+                      <div className="usage-info">
+                        <h4>{asset.name}</h4>
+                        <p className="asset-code">{asset.asset_code}</p>
+                        <p className="asset-type">{asset.asset_type}</p>
+                      </div>
+                      <div className="usage-count">
+                        <span className="count-number">{asset.usage_count}</span>
+                        <span className="count-label">uses</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Asset Details Modal */}
+      {selectedAsset && assetDetails && (
+        <div className="modal-overlay" onClick={() => setSelectedAsset(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Asset Analytics Details</h2>
+              <button 
+                className="close-btn"
+                onClick={() => setSelectedAsset(null)}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="asset-info-section">
+                <h3>{assetDetails.asset?.name}</h3>
+                <p className="asset-code">{assetDetails.asset?.asset_code}</p>
+                
+                <div className="info-grid">
+                  <div className="info-item">
+                    <span className="label">Risk Level:</span>
+                    <span className={getRiskBadgeClass(assetDetails.asset?.risk_level)}>
+                      {assetDetails.asset?.risk_level || 'N/A'}
                     </span>
-                  </td>
-                  <td>{((asset.risk_score || 0) * 100).toFixed(0)}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                  <div className="info-item">
+                    <span className="label">Risk Score:</span>
+                    <span className="value">
+                      {assetDetails.asset?.risk_score 
+                        ? (assetDetails.asset.risk_score * 100).toFixed(1) + '%'
+                        : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <span className="label">Age:</span>
+                    <span className="value">
+                      {assetDetails.asset?.asset_age_months || 0} months
+                    </span>
+                  </div>
+                  <div className="info-item">
+                    <span className="label">Usage (90d):</span>
+                    <span className="value">
+                      {assetDetails.asset?.usage_count || 0} times
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="recommendations-section">
+                <h4>Recommendations</h4>
+                <ul className="recommendations-list">
+                  {assetDetails.recommendations?.map((rec, index) => (
+                    <li key={index}>{rec}</li>
+                  ))}
+                </ul>
+              </div>
+
+              {assetDetails.usage_trend?.length > 0 && (
+                <div className="trend-section">
+                  <h4>Usage Trend (Last 30 Days)</h4>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={assetDetails.usage_trend}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="feature_date" 
+                        tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      />
+                      <YAxis />
+                      <Tooltip labelFormatter={(date) => formatDate(date)} />
+                      <Line 
+                        type="monotone" 
+                        dataKey="usage_count" 
+                        stroke="#3b82f6" 
+                        strokeWidth={2}
+                        name="Usage Count"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
