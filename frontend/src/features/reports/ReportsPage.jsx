@@ -13,6 +13,7 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [exportingCSV, setExportingCSV] = useState(false);
 
   const token = localStorage.getItem("token");
   const institutionId = localStorage.getItem("institutionId");
@@ -133,9 +134,6 @@ export default function Reports() {
     return statusMatch && dateMatch;
   });
 
-  /* ============================
-     ✅ FIXED PDF GENERATION
-     ============================ */
   async function generateReport() {
     setGenerating(true);
 
@@ -146,7 +144,6 @@ export default function Reports() {
     }
 
     try {
-      // Call the API endpoint with Authorization header
       const response = await fetch('http://localhost:8000/generate_report.php', {
         method: 'GET',
         headers: {
@@ -160,10 +157,8 @@ export default function Reports() {
         throw new Error(errorData.error || 'Failed to generate report');
       }
 
-      // Get the PDF blob
       const blob = await response.blob();
       
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -182,6 +177,49 @@ export default function Reports() {
     }
   }
 
+  async function exportAssetsCSV() {
+    setExportingCSV(true);
+
+    if (!token) {
+      alert("Authentication required");
+      setExportingCSV(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:8000/export_assets.php', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to export assets');
+      }
+
+      const blob = await response.blob();
+      
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `assets_export_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      alert('Assets exported successfully!');
+    } catch (error) {
+      console.error('Export assets error:', error);
+      alert('Failed to export assets: ' + error.message);
+    } finally {
+      setExportingCSV(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="reports-page">
@@ -197,13 +235,23 @@ export default function Reports() {
           <h1>Reports & Audit Logs</h1>
           <p>View activity logs and generate reports</p>
         </div>
-        <button
-          className="generate-btn"
-          onClick={generateReport}
-          disabled={generating}
-        >
-          {generating ? "Generating..." : "📥 Generate PDF Report"}
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            className="generate-btn"
+            onClick={exportAssetsCSV}
+            disabled={exportingCSV}
+            style={{ backgroundColor: '#10b981' }}
+          >
+            {exportingCSV ? "Exporting..." : "📊 Export Assets CSV"}
+          </button>
+          <button
+            className="generate-btn"
+            onClick={generateReport}
+            disabled={generating}
+          >
+            {generating ? "Generating..." : "📥 Generate PDF Report"}
+          </button>
+        </div>
       </div>
 
       {error && (

@@ -10,14 +10,15 @@ export default function CheckoutModule() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  
+  const [locations, setLocations] = useState([]);
+
   // Checkout form state
   const [checkoutForm, setCheckoutForm] = useState({
     assetId: "",
     toUserId: "",
-    location: "",
+    locationId: "",
     remarks: ""
-  });
+  }); 
   
   // Checkin form state
   const [checkinForm, setCheckinForm] = useState({
@@ -30,7 +31,7 @@ export default function CheckoutModule() {
   const [transferForm, setTransferForm] = useState({
     assetId: "",
     toDepartmentId: "",
-    location: "",
+    locationId: "",
     remarks: ""
   });
 
@@ -40,6 +41,21 @@ export default function CheckoutModule() {
     console.log('Token retrieved:', token ? 'exists' : 'missing');
     return token;
   };
+
+
+    useEffect(() => {
+    if (activeTab === "checkout") {
+      fetchAvailableAssets();
+      fetchUsers();
+      fetchLocations();
+    } else if (activeTab === "checkin") {
+      fetchCheckedOutAssets();
+    } else if (activeTab === "transfer") {
+      fetchAvailableAssets();
+      fetchDepartments();
+      fetchLocations();
+    }
+  }, [activeTab]);
 
   // Fetch data based on active tab
   useEffect(() => {
@@ -97,6 +113,56 @@ export default function CheckoutModule() {
       setLoading(false);
     }
   };
+
+
+  const fetchLocations = async () => {
+  const token = getToken();
+  
+  if (!token) {
+    console.error("No token found when fetching locations");
+    setLocations([]);
+    return;
+  }
+
+  console.log('Fetching locations with token...');
+  
+  try {
+    const url = "http://localhost:8000/locations.php";
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      }
+    });
+    
+    console.log('Locations response status:', res.status);
+    
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error("Locations fetch failed. Status:", res.status, "Response:", errorText);
+      setLocations([]);
+      return;
+    }
+    
+    const data = await res.json();
+    console.log('Locations response data:', data);
+    
+    if (data.success && Array.isArray(data.locations)) {
+      console.log(`Loaded ${data.locations.length} locations`);
+      setLocations(data.locations);
+    } else if (data.error) {
+      console.error("Error from API:", data.error);
+      setLocations([]);
+    } else {
+      console.error("Unexpected data format:", data);
+      setLocations([]);
+    }
+  } catch (err) {
+    console.error("Failed to load locations:", err);
+    setLocations([]);
+  }
+};
 
   // Fetch checked out assets
   const fetchCheckedOutAssets = async () => {
@@ -444,12 +510,20 @@ export default function CheckoutModule() {
 
             <div className="form-group">
               <label>Location</label>
-              <input
-                type="text"
-                value={checkoutForm.location}
-                onChange={(e) => setCheckoutForm({...checkoutForm, location: e.target.value})}
-                placeholder="e.g., Room 201, Building A"
-              />
+              <select
+                value={checkoutForm.locationId}
+                onChange={(e) => setCheckoutForm({...checkoutForm, locationId: e.target.value})}
+              >
+                <option value="">-- Select Location (Optional) --</option>
+                {locations.map(loc => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
+                    {loc.building && ` - ${loc.building}`}
+                    {loc.floor && `, Floor ${loc.floor}`}
+                    {loc.room && `, Room ${loc.room}`}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="form-group">
@@ -591,12 +665,20 @@ export default function CheckoutModule() {
 
             <div className="form-group">
               <label>New Location</label>
-              <input
-                type="text"
-                value={transferForm.location}
-                onChange={(e) => setTransferForm({...transferForm, location: e.target.value})}
-                placeholder="e.g., Lab 3, Floor 2"
-              />
+              <select
+                value={transferForm.locationId}
+                onChange={(e) => setTransferForm({...transferForm, locationId: e.target.value})}
+              >
+                <option value="">-- Select Location (Optional) --</option>
+                {locations.map(loc => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
+                    {loc.building && ` - ${loc.building}`}
+                    {loc.floor && `, Floor ${loc.floor}`}
+                    {loc.room && `, Room ${loc.room}`}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="form-group">

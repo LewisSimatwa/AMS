@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { LayoutDashboard, Package, FileText, Wrench, BarChart3, ClipboardList, PanelLeftClose, PanelLeft } from "lucide-react";
+import { LayoutDashboard, Package, FileText, Wrench, BarChart3, ClipboardList, PanelLeftClose, PanelLeft, ArrowLeftRight, ShieldCheck, User, HistoryIcon } from "lucide-react";
 import "../styles/Sidebar.css";
 
 export default function Sidebar({ isOpen, setIsOpen, user, onLogout }) {
@@ -8,13 +8,13 @@ export default function Sidebar({ isOpen, setIsOpen, user, onLogout }) {
 
   const menuItems = [
     { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { path: "/checkout", label: "Check In/Out", icon: ClipboardList },
     { path: "/assets", label: "Assets", icon: Package },
-    { path: "/reports", label: "Reports", icon: FileText },
+    { path: "/checkout", label: "Check In/Out", icon: ArrowLeftRight },
     { path: "/maintenance", label: "Maintenance", icon: Wrench },
     { path: "/analytics", label: "Analytics", icon: BarChart3 },
-    { path: "/audit", label: "Audit Logs", icon: ClipboardList },
-    { path: "/usermanagement", label: "User Management", icon: ClipboardList },
+    { path: "/reports", label: "Reports", icon: FileText },
+    { path: "/audit", label: "Audit Logs", icon: HistoryIcon },
+    { path: "/usermanagement", label: "User Management", icon: User },
   ];
 
   const handleLogout = () => {

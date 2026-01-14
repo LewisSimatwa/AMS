@@ -54,7 +54,7 @@ if (!$input) {
 // Validate required fields
 $assetId = $input['assetId'] ?? null;
 $toDepartmentId = $input['toDepartmentId'] ?? null;
-$location = $input['location'] ?? '';
+$locationId = $input['locationId'] ?? null;
 $remarks = $input['remarks'] ?? '';
 
 if (!$assetId || !$toDepartmentId) {
@@ -103,16 +103,42 @@ try {
         throw new Exception("Asset is already in " . $toDepartment['name']);
     }
 
+    // Verify location if provided
+    $locationName = null;
+    if ($locationId) {
+        $stmt = $db->prepare("
+            SELECT name, building, floor, room
+            FROM locations 
+            WHERE id = ? AND institution_id = ?
+        ");
+        $stmt->execute([$locationId, $institution_id]);
+        $location = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($location) {
+            $locationName = $location['name'];
+            if ($location['building']) {
+                $locationName .= ' - ' . $location['building'];
+            }
+            if ($location['floor']) {
+                $locationName .= ', Floor ' . $location['floor'];
+            }
+            if ($location['room']) {
+                $locationName .= ', Room ' . $location['room'];
+            }
+        }
+    }
+
     $fromDepartmentId = $asset['department_id'];
 
-    // Update asset department
+    // Update asset department and location
     $stmt = $db->prepare("
         UPDATE assets 
         SET department_id = ?,
+            location_id = ?,
             updated_at = now()
         WHERE id = ?
     ");
-    $stmt->execute([$toDepartmentId, $assetId]);
+    $stmt->execute([$toDepartmentId, $locationId, $assetId]);
 
     // Create transfer transaction record
     $stmt = $db->prepare("
@@ -135,7 +161,7 @@ try {
         $fromDepartmentId,
         $toDepartmentId,
         '',
-        $location,
+        $locationName,
         $remarks,
         $user_id
     ]);
@@ -164,10 +190,11 @@ try {
         ]),
         json_encode([
             'department_id' => $toDepartmentId,
-            'department_name' => $toDepartment['name']
+            'department_name' => $toDepartment['name'],
+            'location_id' => $locationId
         ]),
         json_encode([
-            'location' => $location,
+            'location' => $locationName,
             'remarks' => $remarks
         ])
     ]);
@@ -180,7 +207,8 @@ try {
         "message" => "Asset transferred successfully",
         "asset_code" => $asset['asset_code'],
         "from_department" => $asset['from_department_name'],
-        "to_department" => $toDepartment['name']
+        "to_department" => $toDepartment['name'],
+        "location" => $locationName
     ]);
 
 } catch (PDOException $e) {

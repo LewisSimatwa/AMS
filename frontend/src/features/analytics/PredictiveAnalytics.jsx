@@ -87,64 +87,88 @@ export default function Analytics() {
   async function fetchBasicStats() {
     const headers = getHeaders();
 
-    // Fetch assets
-    const assetsRes = await fetch(
-      `${BACKEND_URL}/assets?institution_id=${institutionId}`,
-      { headers }
-    );
-
-    if (!assetsRes.ok) throw new Error("Failed to fetch assets");
-
-    const assetsData = await assetsRes.json();
-    const assets = assetsData.assets || [];
-
-    // Calculate basic stats
-    const inUse = assets.filter((a) => a.status === "on_loan").length;
-    const inRepair = assets.filter((a) => a.status === "maintenance").length;
-
-    // Fetch users count
-    let userCount = 0;
     try {
-      const usersRes = await fetch(
-        `${BACKEND_URL}/users?institution_id=${institutionId}`,
+      // Fetch assets
+      const assetsRes = await fetch(
+        `${BACKEND_URL}/assets?institution_id=${institutionId}`,
         { headers }
       );
-      if (usersRes.ok) {
-        const usersData = await usersRes.json();
-        userCount = usersData.users?.length || 0;
-      }
-    } catch (err) {
-      console.warn("Users data not available");
-    }
 
-    // Fetch risk summary
-    let highRisk = 0, mediumRisk = 0, lowRisk = 0;
-    try {
-      const riskRes = await fetch(
-        `${BACKEND_URL}/analytics/summary?institution_id=${institutionId}`,
-        { headers }
-      );
-      if (riskRes.ok) {
-        const riskData = await riskRes.json();
-        if (riskData.success && riskData.summary) {
-          highRisk = riskData.summary.high_risk || 0;
-          mediumRisk = riskData.summary.medium_risk || 0;
-          lowRisk = riskData.summary.low_risk || 0;
+      if (!assetsRes.ok) {
+        if (assetsRes.status === 401) {
+          // Token expired or invalid
+          localStorage.removeItem("token");
+          navigate("/login");
+          throw new Error("Session expired. Please login again.");
         }
+        throw new Error("Failed to fetch assets");
       }
-    } catch (err) {
-      console.warn("Risk summary not available");
-    }
 
-    setStats({
-      totalAssets: assets.length,
-      assetsInUse: inUse,
-      assetsInRepair: inRepair,
-      totalUsers: userCount,
-      highRisk,
-      mediumRisk,
-      lowRisk,
-    });
+      const assetsData = await assetsRes.json();
+      const assets = assetsData.assets || [];
+
+      // Calculate basic stats from assets
+      const inUse = assets.filter((a) => a.status === "on_loan").length;
+      const inRepair = assets.filter((a) => a.status === "maintenance").length;
+
+      // Fetch users count
+      let userCount = 0;
+      try {
+        const usersRes = await fetch(
+          `${BACKEND_URL}/users?institution_id=${institutionId}`,
+          { headers }
+        );
+        if (usersRes.ok) {
+          const usersData = await usersRes.json();
+          userCount = usersData.users?.length || 0;
+        }
+      } catch (err) {
+        console.warn("Users data not available:", err);
+      }
+
+      // Calculate risk levels from dashboardData instead of separate endpoint
+      let highRisk = 0, mediumRisk = 0, lowRisk = 0;
+      
+      // Try to get risk data from analytics service
+      try {
+        const riskRes = await fetch(
+          `${ANALYTICS_URL}/dashboard/${institutionId}`
+        );
+        
+        if (riskRes.ok) {
+          const riskData = await riskRes.json();
+          if (riskData.success && riskData.data?.risk_distribution) {
+            const riskDist = riskData.data.risk_distribution;
+            highRisk = riskDist.find(r => r.risk_level === 'HIGH')?.count || 0;
+            mediumRisk = riskDist.find(r => r.risk_level === 'MEDIUM')?.count || 0;
+            lowRisk = riskDist.find(r => r.risk_level === 'LOW')?.count || 0;
+          }
+        }
+      } catch (err) {
+        console.warn("Risk data not available from analytics service:", err);
+        // Calculate basic risk estimates from asset conditions as fallback
+        const poorCondition = assets.filter(a => a.condition === 'poor').length;
+        const fairCondition = assets.filter(a => a.condition === 'fair').length;
+        const goodCondition = assets.filter(a => a.condition === 'good').length;
+        
+        highRisk = poorCondition;
+        mediumRisk = fairCondition;
+        lowRisk = goodCondition;
+      }
+
+      setStats({
+        totalAssets: assets.length,
+        assetsInUse: inUse,
+        assetsInRepair: inRepair,
+        totalUsers: userCount,
+        highRisk,
+        mediumRisk,
+        lowRisk,
+      });
+    } catch (err) {
+      console.error("Error in fetchBasicStats:", err);
+      throw err;
+    }
   }
 
   async function fetchAnalyticsDashboard() {
@@ -156,6 +180,8 @@ export default function Analytics() {
         if (result.success) {
           setDashboardData(result.data);
         }
+      } else {
+        console.warn("Analytics dashboard returned:", response.status);
       }
     } catch (err) {
       console.warn("Analytics dashboard not available:", err);
@@ -164,12 +190,19 @@ export default function Analytics() {
 
   async function runPredictiveAnalysis() {
     setProcessing(true);
+    setError("");
+    
     try {
       // Extract features
       const featuresRes = await fetch(
         `${ANALYTICS_URL}/extract-features/${institutionId}`,
         { method: 'POST' }
       );
+      
+      if (!featuresRes.ok) {
+        throw new Error(`Feature extraction failed: ${featuresRes.status}`);
+      }
+      
       const featuresData = await featuresRes.json();
       
       if (!featuresData.success) {
@@ -181,6 +214,11 @@ export default function Analytics() {
         `${ANALYTICS_URL}/calculate-risks/${institutionId}`,
         { method: 'POST' }
       );
+      
+      if (!risksRes.ok) {
+        throw new Error(`Risk calculation failed: ${risksRes.status}`);
+      }
+      
       const risksData = await risksRes.json();
       
       if (!risksData.success) {
@@ -193,6 +231,7 @@ export default function Analytics() {
       await fetchAllData();
     } catch (err) {
       console.error("Analysis error:", err);
+      setError("Failed to run analysis: " + err.message);
       alert("Failed to run analysis: " + err.message);
     } finally {
       setProcessing(false);
@@ -350,7 +389,7 @@ export default function Analytics() {
       <div className="tab-content">
         {activeTab === 'overview' && (
           <div className="overview-tab">
-            {dashboardData && (
+            {dashboardData ? (
               <div className="charts-grid">
                 {/* Risk Distribution Chart */}
                 <div className="chart-card">
@@ -401,6 +440,10 @@ export default function Analytics() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
+              </div>
+            ) : (
+              <div className="no-data-card">
+                <p>No analytics data available. Run the predictive analysis to generate insights.</p>
               </div>
             )}
           </div>
@@ -510,7 +553,7 @@ export default function Analytics() {
               Most frequently used assets (last 90 days)
             </p>
             
-            {dashboardData?.usage_patterns?.length > 0 && (
+            {dashboardData?.usage_patterns?.length > 0 ? (
               <>
                 <div className="chart-card">
                   <ResponsiveContainer width="100%" height={400}>
@@ -545,6 +588,8 @@ export default function Analytics() {
                   ))}
                 </div>
               </>
+            ) : (
+              <p className="no-data">No usage data available</p>
             )}
           </div>
         )}

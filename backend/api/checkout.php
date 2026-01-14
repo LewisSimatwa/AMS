@@ -54,7 +54,7 @@ if (!$input) {
 // Validate required fields
 $assetId = $input['assetId'] ?? null;
 $toUserId = $input['toUserId'] ?? null;
-$location = $input['location'] ?? '';
+$locationId = $input['locationId'] ?? null;
 $remarks = $input['remarks'] ?? '';
 
 if (!$assetId || !$toUserId) {
@@ -96,15 +96,41 @@ try {
         throw new Exception("User not found or inactive");
     }
 
-    // Update asset status and current holder
+    // Verify location if provided
+    $locationName = null;
+    if ($locationId) {
+        $stmt = $db->prepare("
+            SELECT name, building, floor, room
+            FROM locations 
+            WHERE id = ? AND institution_id = ?
+        ");
+        $stmt->execute([$locationId, $institution_id]);
+        $location = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($location) {
+            $locationName = $location['name'];
+            if ($location['building']) {
+                $locationName .= ' - ' . $location['building'];
+            }
+            if ($location['floor']) {
+                $locationName .= ', Floor ' . $location['floor'];
+            }
+            if ($location['room']) {
+                $locationName .= ', Room ' . $location['room'];
+            }
+        }
+    }
+
+    // Update asset status, current holder, and location
     $stmt = $db->prepare("
         UPDATE assets 
         SET status = 'on_loan',
             current_holder_id = ?,
+            location_id = ?,
             updated_at = now()
         WHERE id = ?
     ");
-    $stmt->execute([$toUserId, $assetId]);
+    $stmt->execute([$toUserId, $locationId, $assetId]);
 
     // Create transaction record
     $stmt = $db->prepare("
@@ -127,7 +153,7 @@ try {
         $toUserId,
         $asset['department_id'],
         $asset['department_id'],
-        $location,
+        $locationName,
         $remarks,
         $user_id
     ]);
@@ -152,10 +178,11 @@ try {
         json_encode([
             'status' => 'on_loan',
             'current_holder_id' => $toUserId,
-            'holder_name' => $toUser['first_name'] . ' ' . $toUser['last_name']
+            'holder_name' => $toUser['first_name'] . ' ' . $toUser['last_name'],
+            'location_id' => $locationId
         ]),
         json_encode([
-            'location' => $location,
+            'location' => $locationName,
             'remarks' => $remarks
         ])
     ]);
@@ -167,7 +194,8 @@ try {
         "success" => true,
         "message" => "Asset checked out successfully",
         "asset_code" => $asset['asset_code'],
-        "holder" => $toUser['first_name'] . ' ' . $toUser['last_name']
+        "holder" => $toUser['first_name'] . ' ' . $toUser['last_name'],
+        "location" => $locationName
     ]);
 
 } catch (PDOException $e) {
