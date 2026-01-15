@@ -14,6 +14,14 @@ import AuditLogs from "./features/audit/AuditLogs";
 import ProtectedRoute from "./components/ProtectedRoute";
 import CheckOut from "./features/assets/Checkout";
 import RetireAsset from "./features/assets/RetireAsset";
+//super-admin routes
+import SuperAdminLayout from './layouts/SuperAdminLayout';
+import SuperAdminDashboard from './features/superAdmin/Dashboard';
+import SuperAdminInstitutions from './features/superAdmin/Institutions';
+//import SuperAdminUsers from './features/superAdmin/Users';
+//import SuperAdminAssets from './features/superAdmin/Assets';
+//import SuperAdminReports from './features/superAdmin/Reports';
+
 
 
 export default function AppRouter() {
@@ -28,6 +36,7 @@ export default function AppRouter() {
 
         {/* Protected routes */}
         <Route element={<ProtectedRoute />}>
+          {/* Regular user routes with MainLayout */}
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/assets" element={<AssetsDetails />} />
@@ -38,6 +47,16 @@ export default function AppRouter() {
             <Route path="/audit" element={<AuditLogs />} />
             <Route path="/checkout" element={<CheckOut/>} />
             <Route path="/usermanagement" element={<UserManagement/>} />
+          </Route>
+
+          {/* Super-admin routes with SuperAdminLayout */}
+          <Route path="/super-admin" element={<SuperAdminLayout />}>
+            <Route index element={<SuperAdminDashboard />} />
+            <Route path="dashboard" element={<SuperAdminDashboard />} />
+            <Route path="institutions" element={<SuperAdminInstitutions />} />
+            {/*<Route path="users" element={<SuperAdminUsers />} />*/}
+            {/*<Route path="assets" element={<SuperAdminAssets />} />*/}
+            {/*<Route path="reports" element={<SuperAdminReports />} />*/}
           </Route>
         </Route>
       </Routes>

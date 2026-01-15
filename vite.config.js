@@ -5,6 +5,9 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: true, // allow access from network
+    allowedHosts: ['arachidic-awedly-bell.ngrok-free.dev'], // add your ngrok host here
+    strictPort: false,
     proxy: {
       '/backend': {
         target: 'http://localhost:8000',
@@ -12,11 +15,9 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/backend/, '/backend/api'),
         configure: (proxy, options) => {
           proxy.on('proxyReq', (proxyReq, req, res) => {
-            // Explicitly forward Authorization header
             if (req.headers.authorization) {
               proxyReq.setHeader('Authorization', req.headers.authorization);
             }
-            // Forward all other headers
             Object.keys(req.headers).forEach(key => {
               if (key.toLowerCase() !== 'host') {
                 proxyReq.setHeader(key, req.headers[key]);

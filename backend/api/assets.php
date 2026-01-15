@@ -29,13 +29,16 @@ function handleAssets($db, $method, $path) {
                     a.status,
                     a.created_at,
                     a.updated_at,
+                    a.date_retired,
                     d.name as department,
                     at.name as category,
-                    u.username as assigned_to
+                    u.username as assigned_to,
+                    l.name as location
                 FROM assets a
                 LEFT JOIN departments d ON a.department_id = d.id
                 LEFT JOIN asset_types at ON a.asset_type_id = at.id
                 LEFT JOIN users u ON a.current_holder_id = u.id
+                LEFT JOIN locations l ON a.location_id = l.id
                 WHERE a.institution_id = ?
                 ORDER BY a.created_at DESC
             ");
@@ -112,7 +115,7 @@ function handleAssets($db, $method, $path) {
             
             $db->beginTransaction();
             
-            // Insert asset
+            // Insert asset (including location_id)
             $stmt = $db->prepare("
                 INSERT INTO assets (
                     institution_id,
@@ -125,9 +128,10 @@ function handleAssets($db, $method, $path) {
                     acquisition_cost,
                     condition,
                     status,
+                    location_id,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
                 RETURNING id
             ");
             
@@ -141,7 +145,8 @@ function handleAssets($db, $method, $path) {
                 $input['purchase_date'] ?? null,
                 $input['purchase_cost'] ?? 0,
                 'good', // default condition
-                $input['status'] ?? 'available'
+                $input['status'] ?? 'available',
+                $input['location_id'] ?? null
             ]);
             
             $assetId = $stmt->fetchColumn();
@@ -179,13 +184,15 @@ function handleAssets($db, $method, $path) {
             
             $db->commit();
             
-            // Fetch the created asset with joins
+            // Fetch the created asset with joins (including location)
             $getStmt = $db->prepare("
                 SELECT 
                     a.*,
-                    at.name as category
+                    at.name as category,
+                    l.name as location
                 FROM assets a
                 LEFT JOIN asset_types at ON a.asset_type_id = at.id
+                LEFT JOIN locations l ON a.location_id = l.id
                 WHERE a.id = ?
             ");
             $getStmt->execute([$assetId]);
@@ -218,11 +225,13 @@ function handleAssets($db, $method, $path) {
                     a.*,
                     d.name as department,
                     at.name as category,
-                    u.username as assigned_to
+                    u.username as assigned_to,
+                    l.name as location
                 FROM assets a
                 LEFT JOIN departments d ON a.department_id = d.id
                 LEFT JOIN asset_types at ON a.asset_type_id = at.id
                 LEFT JOIN users u ON a.current_holder_id = u.id
+                LEFT JOIN locations l ON a.location_id = l.id
                 WHERE a.id = ? AND a.institution_id = ?
             ");
             $stmt->execute([$assetId, $institutionId]);
@@ -266,7 +275,7 @@ function handleAssets($db, $method, $path) {
             $updateFields = [];
             $updateValues = [];
             
-            $allowedFields = ['name', 'description', 'serial_number', 'status', 'condition'];
+            $allowedFields = ['name', 'description', 'serial_number', 'status', 'condition', 'location_id'];
             
             foreach ($allowedFields as $field) {
                 if (isset($input[$field])) {
@@ -296,13 +305,15 @@ function handleAssets($db, $method, $path) {
             
             $db->commit();
             
-            // Fetch updated asset
+            // Fetch updated asset (including location)
             $getStmt = $db->prepare("
                 SELECT 
                     a.*,
-                    at.name as category
+                    at.name as category,
+                    l.name as location
                 FROM assets a
                 LEFT JOIN asset_types at ON a.asset_type_id = at.id
+                LEFT JOIN locations l ON a.location_id = l.id
                 WHERE a.id = ?
             ");
             $getStmt->execute([$assetId]);

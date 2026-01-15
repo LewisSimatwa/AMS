@@ -8,6 +8,7 @@ export default function CreateAccount() {
     fullName: "",
     email: "",
     password: "",
+    confirmPassword: "",
     institution_id: ""
   });
   const [loading, setLoading] = useState(false);
@@ -47,6 +48,12 @@ export default function CreateAccount() {
       if (form.password.length < 6) {
         throw new Error("Password must be at least 6 characters");
       }
+      if (!form.confirmPassword) {
+        throw new Error("Please confirm your password");
+      }
+      if (form.password !== form.confirmPassword) {
+        throw new Error("Passwords do not match");
+      }
       if (!form.fullName.trim()) {
         throw new Error("Please enter your full name");
       }
@@ -61,7 +68,7 @@ export default function CreateAccount() {
 
       // Show success message
       setSuccess(message || "Account created successfully! Redirecting to login...");
-      setForm({ fullName: "", email: "", password: "", institution_id: "" });
+      setForm({ fullName: "", email: "", password: "", confirmPassword: "", institution_id: "" });
 
       // Redirect to login after 2 seconds
       setTimeout(() => {
@@ -79,7 +86,6 @@ export default function CreateAccount() {
   return (
     <div className="login-container">
       <div className="login-left">
-            <div className="login-left">
         <div className="bg-decoration">
           <div className="bg-circle bg-circle-1"></div>
           <div className="bg-circle bg-circle-2"></div>
@@ -98,7 +104,6 @@ export default function CreateAccount() {
             </p>
           </div>
         </div>
-      </div>  
       </div>
       <div className="login-right">
         <div className="form-wrapper">
@@ -172,6 +177,24 @@ export default function CreateAccount() {
                     required
                     disabled={loading}
                     minLength={6}
+                  />
+                </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div className="form-field">
+                <label className="field-label">Confirm Password</label>
+                <div className="input-group">
+                  <Lock className="input-icon" />
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    value={form.confirmPassword}
+                    onChange={handleChange}
+                    placeholder="Re-enter your password"
+                    className="input-field"
+                    required
+                    disabled={loading}
                   />
                 </div>
               </div>

@@ -21,26 +21,44 @@ function login() {
         
         error_log("auth.php login: Input received - " . json_encode($input));
 
-        if (empty($input['email']) || empty($input['password']) || empty($input['institution_id'])) {
+        if (empty($input['email']) || empty($input['password'])) {
             error_log("auth.php login: Missing required fields");
-            respond(['error' => 'Missing fields'], 400);
+            respond(['error' => 'Missing email or password'], 400);
         }
 
-        // Fetch user with role
-        $sql = "SELECT u.id, u.email, u.username, u.first_name, u.last_name, u.password_hash, 
-                       r.name AS role, u.institution_id
-                FROM users u
-                LEFT JOIN user_roles ur ON u.id = ur.user_id
-                LEFT JOIN roles r ON ur.role_id = r.id
-                WHERE u.email = ? AND u.institution_id = ?
-                LIMIT 1";
+        // Check if this is a super admin login (no institution required)
+        $isSuperAdminAttempt = !isset($input['institution_id']) || $input['institution_id'] === null || $input['institution_id'] === '';
 
-        $stmt = $db->prepare($sql);
-        $stmt->execute([$input['email'], $input['institution_id']]);
+        if ($isSuperAdminAttempt) {
+            // Super admin login - institution_id should be NULL
+            $sql = "SELECT u.id, u.email, u.username, u.first_name, u.last_name, u.password_hash, 
+                           r.name AS role, u.institution_id
+                    FROM users u
+                    LEFT JOIN user_roles ur ON u.id = ur.user_id
+                    LEFT JOIN roles r ON ur.role_id = r.id
+                    WHERE u.email = ? AND u.institution_id IS NULL
+                    LIMIT 1";
+            
+            $stmt = $db->prepare($sql);
+            $stmt->execute([$input['email']]);
+        } else {
+            // Regular user login - requires institution_id
+            $sql = "SELECT u.id, u.email, u.username, u.first_name, u.last_name, u.password_hash, 
+                           r.name AS role, u.institution_id
+                    FROM users u
+                    LEFT JOIN user_roles ur ON u.id = ur.user_id
+                    LEFT JOIN roles r ON ur.role_id = r.id
+                    WHERE u.email = ? AND u.institution_id = ?
+                    LIMIT 1";
+
+            $stmt = $db->prepare($sql);
+            $stmt->execute([$input['email'], (int)$input['institution_id']]);
+        }
+
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$user) {
-            error_log("auth.php login: User not found - " . $input['email']);
+            error_log("auth.php login: User not found - " . $input['email'] . " with institution: " . ($isSuperAdminAttempt ? 'NULL' : $input['institution_id']));
             respond(['error' => 'Invalid credentials'], 401);
         }
 
@@ -49,20 +67,25 @@ function login() {
             respond(['error' => 'Invalid credentials'], 401);
         }
 
+        // Normalize role name
+        if (strtolower($user['role']) === 'super_admin' || strtolower($user['role']) === 'superadmin') {
+            $user['role'] = 'super_admin';
+        }
+
         // Log login in audit table
         logAudit($db, $user['id'], 'auth', $user['id'], 'LOGIN', null, null);
 
-        // Generate JWT token
+        // Generate JWT token with role information
         $token = generateToken($user);
 
         // Update last login
         $stmt = $db->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
         $stmt->execute([$user['id']]);
 
-        // Remove password from response
+        // Remove sensitive data from response
         unset($user['password_hash']);
 
-        error_log("auth.php login: Login successful for - " . $input['email']);
+        error_log("auth.php login: Login successful for - " . $input['email'] . " with role: " . $user['role']);
 
         respond([
             'token' => $token,
@@ -89,6 +112,23 @@ function logout() {
     } catch (Exception $e) {
         error_log('auth.php logout error: ' . $e->getMessage());
         respond(['error' => 'Logout failed: ' . $e->getMessage()], 500);
+    }
+}
+
+function verifySuperAdmin() {
+    try {
+        $decoded = verifyAuth();
+        
+        // Check if user has super_admin role
+        if (!isset($decoded['role']) || $decoded['role'] !== 'super_admin') {
+            error_log('Access denied: User does not have super_admin role');
+            respond(['error' => 'Access denied. Super admin privileges required.'], 403);
+        }
+        
+        return $decoded;
+    } catch (Exception $e) {
+        error_log('Super admin verification error: ' . $e->getMessage());
+        respond(['error' => 'Authentication failed'], 401);
     }
 }
 

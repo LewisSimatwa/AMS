@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Eye, EyeOff, Mail, Lock, LogIn, Building } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { loginUser } from "../../api/loginUser";
 import "../../styles/login.css";
 
 export default function Login() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({ 
     email: "", 
     password: "",
@@ -13,6 +14,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [institutions, setInstitutions] = useState([
     { id: "1", name: "Nairobi University" },
     { id: "2", name: "Kampala Institute of Technology" },
@@ -23,25 +25,50 @@ export default function Login() {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
+  // Detect if email is super admin
+  function handleEmailChange(e) {
+    const email = e.target.value;
+    setForm({ ...form, email });
+    
+    // Check if this looks like a super admin email
+    if (email.includes('super@') || email === 'super@miams.system') {
+      setIsSuperAdmin(true);
+      setForm(prev => ({ ...prev, institution_id: "" }));
+    } else {
+      setIsSuperAdmin(false);
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      // Convert institution_id to number
-      const institutionId = parseInt(form.institution_id, 10);
-
-      // Call login API with email, password, and institution_id
-      const response = await loginUser(form.email, form.password, parseInt(form.institution_id, 10));
+      // Call login API with email, password, and institution_id (if not super admin)
+      const response = await loginUser(
+        form.email, 
+        form.password, 
+        isSuperAdmin ? null : parseInt(form.institution_id, 10)
+      );
       
-      // Store data in localStorage
+      // Store data in sessionStorage
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
-      localStorage.setItem("institutionId", institutionId);
+      if (!isSuperAdmin) {
+        localStorage.setItem("institutionId", parseInt(form.institution_id, 10));
+      }
       
-      // Redirect to dashboard
-      window.location.href = "/dashboard";
+      // Route based on user role
+      const userRole = response.user.role?.toLowerCase();
+      
+      if (userRole === 'super_admin') {
+        navigate("/super-admin/dashboard");
+      } else if (userRole === 'admin') {
+        navigate("/dashboard");
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err) {
       setError(err.message || "Login failed");
     } finally {
@@ -60,7 +87,7 @@ export default function Login() {
           <div className="logo-wrapper">
             <div className="logo-glow"></div>
             <div className="logo-container">
-              <img src="frontend\public\miams_logo.svg" alt="MIAMS Logo" className="logo-image" />
+              <img src="/miams_logo.svg" alt="MIAMS Logo" className="logo-image" />
             </div>
           </div>
           <div className="brand-text">
@@ -87,31 +114,6 @@ export default function Login() {
             )}
 
             <form className="form-content" onSubmit={handleSubmit}>
-              {/* Institution Selection */}
-              <div className="form-field">
-                <label className="field-label">Institution</label>
-                <div className="input-group">
-                  <Building className="input-icon" size={20} strokeWidth={2} />
-                  <select
-                    name="institution_id"
-                    value={form.institution_id}
-                    onChange={handleChange}
-                    className="input-field"
-                    required
-                  >
-                    <option value="" disabled>
-                      Select an institution
-                    </option>
-                    {institutions.map((inst) => (
-                      <option key={inst.id} value={inst.id}>
-                        {inst.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Email Field */}
               <div className="form-field">
                 <label className="field-label">Email Address</label>
                 <div className="input-group">
@@ -120,7 +122,7 @@ export default function Login() {
                     type="email"
                     name="email"
                     value={form.email}
-                    onChange={handleChange}
+                    onChange={handleEmailChange}
                     placeholder="you@example.com"
                     className="input-field"
                     required
@@ -128,7 +130,39 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Password Field */}
+              {!isSuperAdmin && (
+                <div className="form-field">
+                  <label className="field-label">Institution</label>
+                  <div className="input-group">
+                    <Building className="input-icon" size={20} strokeWidth={2} />
+                    <select
+                      name="institution_id"
+                      value={form.institution_id}
+                      onChange={handleChange}
+                      className="input-field"
+                      required
+                    >
+                      <option value="" disabled>
+                        Select an institution
+                      </option>
+                      {institutions.map((inst) => (
+                        <option key={inst.id} value={inst.id}>
+                          {inst.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {isSuperAdmin && (
+                <div className="form-field">
+                  <p style={{ color: '#10b981', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                    Super Admin login detected - no institution required
+                  </p>
+                </div>
+              )}
+
               <div className="form-field">
                 <label className="field-label">Password</label>
                 <div className="input-group">

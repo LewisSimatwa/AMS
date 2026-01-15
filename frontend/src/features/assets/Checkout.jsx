@@ -509,12 +509,13 @@ export default function CheckoutModule() {
             </div>
 
             <div className="form-group">
-              <label>Location</label>
+              <label>Location *</label>
               <select
                 value={checkoutForm.locationId}
                 onChange={(e) => setCheckoutForm({...checkoutForm, locationId: e.target.value})}
+                required
               >
-                <option value="">-- Select Location (Optional) --</option>
+                <option value="">-- Select Location --</option>
                 {locations.map(loc => (
                   <option key={loc.id} value={loc.id}>
                     {loc.name}
@@ -664,12 +665,13 @@ export default function CheckoutModule() {
             </div>
 
             <div className="form-group">
-              <label>New Location</label>
+              <label>New Location *</label>
               <select
                 value={transferForm.locationId}
                 onChange={(e) => setTransferForm({...transferForm, locationId: e.target.value})}
+                required
               >
-                <option value="">-- Select Location (Optional) --</option>
+                <option value="">-- Select Location --</option>
                 {locations.map(loc => (
                   <option key={loc.id} value={loc.id}>
                     {loc.name}

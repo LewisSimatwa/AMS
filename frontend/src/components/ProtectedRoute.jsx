@@ -1,13 +1,17 @@
 import { Navigate, Outlet } from "react-router-dom";
 
 export default function ProtectedRoute() {
-  const token = localStorage.getItem("token");
-
+  const token = sessionStorage.getItem("token");
+  
+  console.log("=== PROTECTED ROUTE CHECK ===");
+  console.log("Token exists:", token ? "YES" : "NO");
+  console.log("Current path:", window.location.pathname);
+  
   if (!token) {
-    // No token, redirect to login
+    console.log("No token found, redirecting to login");
     return <Navigate to="/login" replace />;
   }
-
-  // Token exists, render child routes
+  
+  console.log("Token found, allowing access");
   return <Outlet />;
 }
