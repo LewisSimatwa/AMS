@@ -9,6 +9,7 @@ import {
   X,
   Shield
 } from "lucide-react";
+import "../styles/SuperAdmin/layout.css";
 
 export default function SuperAdminLayout() {
   const navigate = useNavigate();
@@ -18,8 +19,8 @@ export default function SuperAdminLayout() {
 
   useEffect(() => {
     // Check authentication and super admin role
-    const token = sessionStorage.getItem("token");
-    const userData = sessionStorage.getItem("user");
+    const token = localStorage.getItem("token");
+    const userData = localStorage.getItem("user");
     
     if (!token || !userData) {
       navigate("/login");
@@ -64,31 +65,27 @@ export default function SuperAdminLayout() {
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="loading-center">
+        <div className="loading-spinner"></div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="superadmin-layout">
       {/* Sidebar */}
-      <aside 
-        className={`${
-          sidebarOpen ? "w-64" : "w-20"
-        } bg-gradient-to-b from-gray-900 to-gray-800 text-white transition-all duration-300 flex flex-col`}
-      >
+      <aside className={`superadmin-sidebar ${sidebarOpen ? 'sidebar-expanded' : 'sidebar-collapsed'}`}>
         {/* Header */}
-        <div className="p-4 flex items-center justify-between border-b border-gray-700">
+        <div className="sidebar-header">
           {sidebarOpen ? (
             <>
-              <div className="flex items-center space-x-2">
-                <Shield className="text-yellow-400" size={28} />
-                <span className="font-bold text-lg">Super Admin</span>
+              <div className="sidebar-logo">
+                <Shield className="sidebar-logo-icon" size={28} />
+                <span className="sidebar-logo-text">Super Admin</span>
               </div>
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="p-1 hover:bg-gray-700 rounded"
+                className="sidebar-toggle"
               >
                 <X size={20} />
               </button>
@@ -96,7 +93,7 @@ export default function SuperAdminLayout() {
           ) : (
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-1 hover:bg-gray-700 rounded mx-auto"
+              className="sidebar-toggle"
             >
               <Menu size={20} />
             </button>
@@ -104,52 +101,39 @@ export default function SuperAdminLayout() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2">
-          {menuItems.map((item) => (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
-                isActive(item.path)
-                  ? "bg-blue-600 text-white"
-                  : "hover:bg-gray-700 text-gray-300"
-              }`}
-            >
-              <item.icon size={20} />
-              {sidebarOpen && <span>{item.label}</span>}
-            </Link>
-          ))}
+        <nav className="sidebar-nav">
+          <div className="nav-items">
+            {menuItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`nav-item ${isActive(item.path) ? 'active' : ''}`}
+                data-tooltip={item.label}
+              >
+                <item.icon size={20} className="nav-item-icon" />
+                <span className="nav-item-label">{item.label}</span>
+              </Link>
+            ))}
+          </div>
         </nav>
 
         {/* User Info & Logout */}
-        <div className="p-4 border-t border-gray-700">
-          {sidebarOpen ? (
-            <>
-              <div className="mb-3 px-2">
-                <p className="text-sm font-medium truncate">{user.first_name} {user.last_name}</p>
-                <p className="text-xs text-gray-400 truncate">{user.email}</p>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="w-full flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
-              >
-                <LogOut size={18} />
-                <span>Logout</span>
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={handleLogout}
-              className="w-full p-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex justify-center"
-            >
-              <LogOut size={18} />
-            </button>
+        <div className="sidebar-user">
+          {sidebarOpen && (
+            <div className="user-info">
+              <p className="user-name">{user.first_name} {user.last_name}</p>
+              <p className="user-email">{user.email}</p>
+            </div>
           )}
+          <button onClick={handleLogout} className="logout-button">
+            <LogOut size={18} />
+            <span>Logout</span>
+          </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
+      <main className="superadmin-main">
         <Outlet />
       </main>
     </div>

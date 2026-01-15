@@ -21,35 +21,70 @@ export default function SuperAdminDashboard() {
     assetsPerInstitution: []
   });
   const [recentActions, setRecentActions] = useState([]);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
   const fetchDashboardData = async () => {
+    setLoading(true);
+    setError("");
+
     try {
-      const token = sessionStorage.getItem("token");
+      const token = localStorage.getItem("token");
       
+      if (!token) {
+        setError("No authentication token found");
+        setLoading(false);
+        return;
+      }
+
+      const headers = {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      };
+
+      console.log("Fetching super admin stats...");
+
       // Fetch stats
-      const statsResponse = await fetch("http://localhost/miams/api/super-admin/stats.php", {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
+      const statsResponse = await fetch("http://localhost:8000/api/super_admin/stats", {
+        method: "GET",
+        headers: headers
       });
+
+      console.log("Stats response status:", statsResponse.status);
+
+      if (!statsResponse.ok) {
+        const errorText = await statsResponse.text();
+        console.error("Stats error:", errorText);
+        throw new Error(`Failed to fetch stats: ${statsResponse.status}`);
+      }
+
       const statsData = await statsResponse.json();
+      console.log("Stats data:", statsData);
       
       // Fetch recent high-risk actions
-      const actionsResponse = await fetch("http://localhost/miams/api/super-admin/recent-actions.php", {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
+      const actionsResponse = await fetch("http://localhost:8000/api/super_admin/recent-actions", {
+        method: "GET",
+        headers: headers
       });
-      const actionsData = await actionsResponse.json();
+
+      console.log("Actions response status:", actionsResponse.status);
+
+      let actionsData = { actions: [] };
+      if (actionsResponse.ok) {
+        actionsData = await actionsResponse.json();
+        console.log("Actions data:", actionsData);
+      } else {
+        console.warn("Failed to fetch recent actions");
+      }
       
       setStats(statsData);
       setRecentActions(actionsData.actions || []);
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
+      setError(error.message || "Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
@@ -59,6 +94,22 @@ export default function SuperAdminDashboard() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="loading-spinner"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+          <p className="text-red-800">{error}</p>
+          <button 
+            onClick={fetchDashboardData}
+            className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -183,14 +234,15 @@ export default function SuperAdminDashboard() {
                 <div key={index} className="p-3 border-l-4 border-orange-400 bg-orange-50 rounded activity-item">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900">{action.action_type}</p>
-                      <p className="text-sm text-gray-600 mt-1">{action.description}</p>
+                      <p className="font-medium text-gray-900">{action.action_type || action.action}</p>
+                      <p className="text-sm text-gray-600 mt-1">{action.description || 'No description'}</p>
                       <p className="text-xs text-gray-500 mt-2">
-                        By {action.user_name} at {action.institution_name}
+                        {action.user_name ? `By ${action.user_name}` : 'Unknown user'}
+                        {action.institution_name ? ` at ${action.institution_name}` : ''}
                       </p>
                     </div>
                     <span className="badge badge-yellow whitespace-nowrap ml-2">
-                      {new Date(action.timestamp).toLocaleDateString()}
+                      {action.timestamp ? new Date(action.timestamp).toLocaleDateString() : 'Unknown date'}
                     </span>
                   </div>
                 </div>

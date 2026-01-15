@@ -45,14 +45,21 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Call login API with email, password, and institution_id (if not super admin)
+      console.log("Attempting login with:", {
+        email: form.email,
+        institutionId: isSuperAdmin ? null : parseInt(form.institution_id, 10)
+      });
+
+      // Call login API
       const response = await loginUser(
         form.email, 
         form.password, 
         isSuperAdmin ? null : parseInt(form.institution_id, 10)
       );
       
-      // Store data in sessionStorage
+      console.log("Login response:", response);
+      
+      // Store data in localStorage
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
       if (!isSuperAdmin) {
@@ -61,15 +68,20 @@ export default function Login() {
       
       // Route based on user role
       const userRole = response.user.role?.toLowerCase();
+      console.log("User role:", userRole);
       
       if (userRole === 'super_admin') {
+        console.log("Navigating to super admin dashboard");
         navigate("/super-admin/dashboard");
       } else if (userRole === 'admin') {
+        console.log("Navigating to admin dashboard");
         navigate("/dashboard");
       } else {
+        console.log("Navigating to default dashboard");
         navigate("/dashboard");
       }
     } catch (err) {
+      console.error("Login error:", err);
       setError(err.message || "Login failed");
     } finally {
       setLoading(false);
@@ -158,7 +170,7 @@ export default function Login() {
               {isSuperAdmin && (
                 <div className="form-field">
                   <p style={{ color: '#10b981', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-                    Super Admin login detected - no institution required
+                    ✓ Super Admin login detected - no institution required
                   </p>
                 </div>
               )}

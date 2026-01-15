@@ -2,7 +2,6 @@
 require 'config.php';
 require 'helpers.php';
 
-
 // Headers
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -28,20 +27,16 @@ try {
     // ============================================
     // PUBLIC ROUTES (NO TOKEN REQUIRED)
     // ============================================
-    
     if ($path === '/login' && $method === 'POST') {
         require 'auth.php';
         login();
-    }
-    elseif ($path === '/register' && $method === 'POST') {
+    } elseif ($path === '/register' && $method === 'POST') {
         require 'register.php';
         register();
-    }
-    elseif ($path === '/register.php' && $method === 'POST') {
+    } elseif ($path === '/register.php' && $method === 'POST') {
         require 'register.php';
         register();
-    }
-    elseif ($path === '/auth.php' && $method === 'POST') {
+    } elseif ($path === '/auth.php' && $method === 'POST') {
         require 'auth.php';
         $input = getInput();
         $action = $input['action'] ?? 'login';
@@ -50,8 +45,7 @@ try {
         } elseif ($action === 'logout') {
             logout();
         }
-    }
-    elseif ($path === '/logout' && $method === 'POST') {
+    } elseif ($path === '/logout' && $method === 'POST') {
         require 'auth.php';
         logout();
     }
@@ -61,29 +55,22 @@ try {
     // ============================================
     else {
         verifyAuth();
-        
+
         // ----------------------------------------
         // ASSET MANAGEMENT ROUTES
         // ----------------------------------------
-        
-        // Get available assets
         if ($path === '/available' && $method === 'GET') {
             require __DIR__ . '/available.php';
-        }
-        // Delete asset route (must come before general /assets route)
-        elseif ($path === '/delete_asset.php' && $method === 'POST') {
+        } elseif ($path === '/delete_asset.php' && $method === 'POST') {
             require __DIR__ . '/delete_asset.php';
-        }
-        elseif (preg_match('#^/assets/(\d+)$#', $path, $matches) && $method === 'DELETE') {
+        } elseif (preg_match('#^/assets/(\d+)$#', $path, $matches) && $method === 'DELETE') {
             $_GET['id'] = $matches[1];
             require __DIR__ . '/delete_asset.php';
-        }
-        // General assets routes
-        elseif (strpos($path, '/assets') === 0) {
+        } elseif (strpos($path, '/assets') === 0) {
             require 'assets.php';
             handleAssets($db, $method, $path);
         }
-        
+
         // ----------------------------------------
         // TRANSACTION ROUTES
         // ----------------------------------------
@@ -91,7 +78,7 @@ try {
             require 'transactions.php';
             handleTransactions($db, $method, $path);
         }
-        
+
         // ----------------------------------------
         // MAINTENANCE ROUTES
         // ----------------------------------------
@@ -99,7 +86,7 @@ try {
             require 'maintenance.php';
             handleMaintenance($db, $method, $path);
         }
-        
+
         // ----------------------------------------
         // ANALYTICS ROUTES
         // ----------------------------------------
@@ -107,7 +94,7 @@ try {
             require 'analytics.php';
             handleAnalytics($db, $method, $path);
         }
-        
+
         // ----------------------------------------
         // REPORTS ROUTES
         // ----------------------------------------
@@ -115,7 +102,7 @@ try {
             require 'report.php';
             handleReports($db, $method, $path);
         }
-        
+
         // ----------------------------------------
         // AUDIT LOGS ROUTES
         // ----------------------------------------
@@ -123,71 +110,72 @@ try {
             require 'audit_logs.php';
             handleAudit($db, $method, $path);
         }
-        
+
         // ----------------------------------------
         // USER MANAGEMENT ROUTES (ADMIN ONLY)
         // ----------------------------------------
-        
-        // Handle user management with query parameters
-        elseif ($path === '/users.php' && $method === 'GET') {
+        elseif ($path === '/users.php' && in_array($method, ['GET','POST'])) {
             require 'users.php';
             // users.php handles its own routing based on $_GET['action']
-        }
-        elseif ($path === '/users.php' && $method === 'POST') {
-            require 'users.php';
-            // users.php handles its own routing based on $_GET['action']
-        }
-        // Handle RESTful user routes
-        elseif ($path === '/users' && $method === 'GET') {
+        } elseif ($path === '/users' && $method === 'GET') {
             $_GET['action'] = 'list';
             require 'users.php';
-        }
-        elseif ($path === '/users' && $method === 'POST') {
-            // Determine action from request body or default to create
+        } elseif ($path === '/users' && $method === 'POST') {
             $input = json_decode(file_get_contents('php://input'), true);
-            if (isset($input['action'])) {
-                $_GET['action'] = $input['action'];
-            } else {
-                $_GET['action'] = 'create';
-            }
+            $_GET['action'] = $input['action'] ?? 'create';
             require 'users.php';
-        }
-        elseif (preg_match('#^/users/(\d+)$#', $path, $matches) && $method === 'GET') {
-            $_GET['action'] = 'get';
+        } elseif (preg_match('#^/users/(\d+)$#', $path, $matches)) {
             $_GET['id'] = $matches[1];
+            if ($method === 'GET') $_GET['action'] = 'get';
+            elseif ($method === 'PUT') $_GET['action'] = 'update';
+            elseif ($method === 'DELETE') $_GET['action'] = 'delete';
             require 'users.php';
-        }
-        elseif (preg_match('#^/users/(\d+)$#', $path, $matches) && $method === 'PUT') {
-            $_GET['action'] = 'update';
-            $_GET['id'] = $matches[1];
-            require 'users.php';
-        }
-        elseif (preg_match('#^/users/(\d+)$#', $path, $matches) && $method === 'DELETE') {
-            $_GET['action'] = 'delete';
-            $_GET['id'] = $matches[1];
-            require 'users.php';
-        }
-        // User roles endpoint
-        elseif ($path === '/users/roles' && $method === 'GET') {
+        } elseif ($path === '/users/roles' && $method === 'GET') {
             $_GET['action'] = 'get_roles';
             require 'users.php';
-        }
-        // User departments endpoint
-        elseif ($path === '/users/departments' && $method === 'GET') {
+        } elseif ($path === '/users/departments' && $method === 'GET') {
             $_GET['action'] = 'get_departments';
             require 'users.php';
-        }
-        // Toggle user status endpoint
-        elseif (preg_match('#^/users/(\d+)/toggle-status$#', $path, $matches) && $method === 'POST') {
+        } elseif (preg_match('#^/users/(\d+)/toggle-status$#', $path, $matches) && $method === 'POST') {
             $_GET['action'] = 'toggle_status';
             $_GET['id'] = $matches[1];
             require 'users.php';
-        }
-        // General users routes (fallback for any /users/* patterns)
-        elseif (strpos($path, '/users') === 0) {
+        } elseif (strpos($path, '/users') === 0) {
             require 'users.php';
         }
-        
+
+        // ----------------------------------------
+        // SUPER ADMIN ROUTES
+        // ----------------------------------------
+        elseif (strpos($path, '/super_admin') === 0) {
+            // Verify authentication first
+            $decoded = verifyAuth();
+            
+            // Verify super admin role
+            if (!isset($decoded['role']) || $decoded['role'] !== 'super_admin') {
+                respond(['error' => 'Access denied. Super admin privileges required.'], 403);
+            }
+            
+            // Route to appropriate super admin handler
+            if ($path === '/super_admin/stats' && $method === 'GET') {
+                require __DIR__ . '/super_admin/stats.php';
+            } elseif ($path === '/super_admin/recent-actions' && $method === 'GET') {
+                require __DIR__ . '/super_admin/recent-actions.php';
+            } elseif ($path === '/super_admin/institutions' && in_array($method, ['GET', 'POST', 'PUT'])) {
+                require __DIR__ . '/super_admin/institutions.php';
+            } elseif ($path === '/super_admin/assets' && $method === 'GET') {
+                require __DIR__ . '/super_admin/assets.php';
+            } elseif ($path === '/super_admin/force-retire' && $method === 'POST') {
+                require __DIR__ . '/super_admin/force-retire.php';
+            } elseif ($path === '/super_admin/asset-history' && $method === 'GET') {
+                require __DIR__ . '/super_admin/asset-history.php';
+            } elseif ($path === '/super_admin/create-admin' && $method === 'POST') {
+                require __DIR__ . '/super_admin/create-admin.php';
+            } else {
+                respond(['error' => 'Super admin route not found: ' . $path], 404);
+            }
+        }
+
         // ----------------------------------------
         // 404 - ROUTE NOT FOUND
         // ----------------------------------------

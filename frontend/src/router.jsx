@@ -19,7 +19,7 @@ import SuperAdminLayout from './layouts/SuperAdminLayout';
 import SuperAdminDashboard from './features/superAdmin/Dashboard';
 import SuperAdminInstitutions from './features/superAdmin/Institutions';
 //import SuperAdminUsers from './features/superAdmin/Users';
-//import SuperAdminAssets from './features/superAdmin/Assets';
+import SuperAdminAssets from './features/superAdmin/Assets';
 //import SuperAdminReports from './features/superAdmin/Reports';
 
 
@@ -55,7 +55,7 @@ export default function AppRouter() {
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="institutions" element={<SuperAdminInstitutions />} />
             {/*<Route path="users" element={<SuperAdminUsers />} />*/}
-            {/*<Route path="assets" element={<SuperAdminAssets />} />*/}
+            <Route path="assets" element={<SuperAdminAssets />} />
             {/*<Route path="reports" element={<SuperAdminReports />} />*/}
           </Route>
         </Route>

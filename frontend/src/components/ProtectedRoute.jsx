@@ -1,7 +1,7 @@
 import { Navigate, Outlet } from "react-router-dom";
 
 export default function ProtectedRoute() {
-  const token = sessionStorage.getItem("token");
+  const token = localStorage.getItem("token");
   
   console.log("=== PROTECTED ROUTE CHECK ===");
   console.log("Token exists:", token ? "YES" : "NO");
