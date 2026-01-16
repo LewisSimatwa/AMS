@@ -6,7 +6,7 @@ import ForgotPassword from "./features/auth/ForgotPassword";
 import Dashboard from "./features/dashboard/Dashboard";
 import AssetsDetails from "./features/assets/AssetsDetails";
 import PredictiveAnalytics from "./features/analytics/PredictiveAnalytics";
-import Reports from "./features/reports/ReportsPage";
+import Report from "./features/reports/ReportsPage";
 import UserManagement from "./features/users/UserManagement";
 import MainLayout from "./layouts/MainLayout";
 import Maintenance from "./features/maintenance/Maintenance";
@@ -40,7 +40,7 @@ export default function AppRouter() {
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/assets" element={<AssetsDetails />} />
-            <Route path="/reports" element={<Reports />} />
+            <Route path="/report" element={<Report />} />
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/analytics" element={<PredictiveAnalytics />} />
             <Route path="/users" element={<UserManagement />} />

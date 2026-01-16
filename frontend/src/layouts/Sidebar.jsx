@@ -12,7 +12,7 @@ export default function Sidebar({ isOpen, setIsOpen, user, onLogout }) {
     { path: "/checkout", label: "Check In/Out", icon: ArrowLeftRight },
     { path: "/maintenance", label: "Maintenance", icon: Wrench },
     { path: "/analytics", label: "Analytics", icon: BarChart3 },
-    { path: "/reports", label: "Reports", icon: FileText },
+    { path: "/report", label: "Reports", icon: FileText },
     { path: "/audit", label: "Audit Logs", icon: HistoryIcon },
     { path: "/usermanagement", label: "User Management", icon: User },
   ];

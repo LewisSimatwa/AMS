@@ -28,29 +28,42 @@ try {
         case 'GET':
             error_log("Fetching all institutions with stats...");
 
-            $stmt = $db->query("
-                SELECT 
-                    i.id,
-                    i.name,
-                    i.code,
-                    i.address,
-                    i.contact_email,
-                    i.created_at,
-                    i.updated_at,
-                    COUNT(DISTINCT u.id) AS user_count,
-                    COUNT(DISTINCT a.id) AS asset_count
-                FROM institutions i
-                LEFT JOIN users u ON i.id = u.institution_id
-                LEFT JOIN assets a ON i.id = a.institution_id
-                GROUP BY i.id, i.name, i.code, i.address, i.contact_email, i.created_at, i.updated_at
-                ORDER BY i.name ASC
-            ");
+        // In the GET method section
+        $stmt = $db->query("
+            SELECT 
+                i.id,
+                i.name,
+                i.code,
+                i.address,
+                i.contact_email,
+                i.is_active,
+                i.created_at,
+                i.updated_at,
+                COUNT(DISTINCT u.id) as user_count,
+                COUNT(DISTINCT a.id) as asset_count
+            FROM institutions i
+            LEFT JOIN users u ON i.id = u.institution_id
+            LEFT JOIN assets a ON i.id = a.institution_id
+            GROUP BY i.id, i.name, i.code, i.address, i.contact_email, 
+                    i.is_active, i.created_at, i.updated_at
+            ORDER BY i.is_active DESC, i.name ASC
+        ");
 
-            $institutions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            error_log("Found " . count($institutions) . " institutions");
+        $institutions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            respond(['institutions' => $institutions]);
-            break;
+        // Convert is_active to boolean
+        foreach ($institutions as &$institution) {
+            $institution['is_active'] = (bool)$institution['is_active'];
+            $institution['user_count'] = (int)$institution['user_count'];
+            $institution['asset_count'] = (int)$institution['asset_count'];
+        }
+
+        respond([
+            'institutions' => $institutions,
+            'total' => count($institutions),
+            'active' => count(array_filter($institutions, fn($i) => $i['is_active'])),
+            'inactive' => count(array_filter($institutions, fn($i) => !$i['is_active']))
+        ]);
 
         // ----------------------------------------
         // POST: Create new institution

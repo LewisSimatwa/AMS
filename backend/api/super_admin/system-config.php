@@ -25,17 +25,32 @@ try {
         // Fetch current configuration
         error_log("Fetching system configuration...");
         
-        // Get asset categories from asset_types table
-        $categoriesStmt = $db->query("
-            SELECT 
-                id,
-                name,
-                description
-            FROM asset_types
-            WHERE institution_id IS NULL
-            ORDER BY name ASC
-        ");
-        $assetCategories = $categoriesStmt->fetchAll(PDO::FETCH_ASSOC);
+        // Get asset categories from asset_types table (global categories only)
+        try {
+            $categoriesStmt = $db->query("
+                SELECT 
+                    id,
+                    name,
+                    COALESCE(description, '') as description
+                FROM asset_types
+                WHERE institution_id IS NULL
+                ORDER BY name ASC
+            ");
+            $assetCategories = $categoriesStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            error_log("Found " . count($assetCategories) . " global asset categories");
+            
+            // Ensure description is never null
+            foreach ($assetCategories as &$category) {
+                if ($category['description'] === null) {
+                    $category['description'] = '';
+                }
+            }
+            
+        } catch (PDOException $e) {
+            error_log("Error fetching asset categories: " . $e->getMessage());
+            $assetCategories = [];
+        }
         
         // Get global statuses from system_settings
         $statusesStmt = $db->prepare("
@@ -50,8 +65,8 @@ try {
         
         $globalStatuses = [];
         if ($statusesRow && $statusesRow['value']) {
-            $decoded = json_decode($statusesRow['value'], true);
-            $globalStatuses = $decoded ?: [];
+            $decoded_statuses = json_decode($statusesRow['value'], true);
+            $globalStatuses = $decoded_statuses ?: [];
         }
         
         // Default statuses if none exist
@@ -84,8 +99,8 @@ try {
         ];
         
         if ($csvRulesRow && $csvRulesRow['value']) {
-            $decoded = json_decode($csvRulesRow['value'], true);
-            $csvRules = array_merge($csvRules, $decoded ?: []);
+            $decoded_rules = json_decode($csvRulesRow['value'], true);
+            $csvRules = array_merge($csvRules, $decoded_rules ?: []);
         }
         
         // Get password policies
@@ -112,9 +127,11 @@ try {
         ];
         
         if ($passwordPoliciesRow && $passwordPoliciesRow['value']) {
-            $decoded = json_decode($passwordPoliciesRow['value'], true);
-            $passwordPolicies = array_merge($passwordPolicies, $decoded ?: []);
+            $decoded_policies = json_decode($passwordPoliciesRow['value'], true);
+            $passwordPolicies = array_merge($passwordPolicies, $decoded_policies ?: []);
         }
+        
+        error_log("Sending response with " . count($assetCategories) . " categories");
         
         respond([
             'asset_categories' => $assetCategories,
@@ -146,10 +163,16 @@ try {
                 ");
                 $existingIds = $existingStmt->fetchAll(PDO::FETCH_COLUMN);
                 
+                error_log("Existing global category IDs: " . json_encode($existingIds));
+                
                 // Process each category from input
                 foreach ($data as $category) {
-                    if (isset($category['id']) && in_array($category['id'], $existingIds)) {
+                    $categoryId = isset($category['id']) ? (int)$category['id'] : null;
+                    $description = isset($category['description']) ? $category['description'] : '';
+                    
+                    if ($categoryId && in_array($categoryId, $existingIds)) {
                         // Update existing
+                        error_log("Updating category ID: $categoryId");
                         $updateStmt = $db->prepare("
                             UPDATE asset_types 
                             SET name = :name, description = :description 
@@ -157,27 +180,29 @@ try {
                         ");
                         $updateStmt->execute([
                             ':name' => $category['name'],
-                            ':description' => $category['description'] ?? null,
-                            ':id' => $category['id']
+                            ':description' => $description,
+                            ':id' => $categoryId
                         ]);
                         
                         // Remove from existing IDs list
-                        $existingIds = array_diff($existingIds, [$category['id']]);
+                        $existingIds = array_diff($existingIds, [$categoryId]);
                     } else {
                         // Insert new
+                        error_log("Inserting new category: " . $category['name']);
                         $insertStmt = $db->prepare("
                             INSERT INTO asset_types (institution_id, name, description) 
                             VALUES (NULL, :name, :description)
                         ");
                         $insertStmt->execute([
                             ':name' => $category['name'],
-                            ':description' => $category['description'] ?? null
+                            ':description' => $description
                         ]);
                     }
                 }
                 
                 // Delete removed categories
                 if (!empty($existingIds)) {
+                    error_log("Deleting removed category IDs: " . json_encode($existingIds));
                     $placeholders = implode(',', array_fill(0, count($existingIds), '?'));
                     $deleteStmt = $db->prepare("
                         DELETE FROM asset_types 

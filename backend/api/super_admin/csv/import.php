@@ -39,9 +39,32 @@ try {
         respond(['error' => 'Institution not found'], 404);
     }
     
-    // Parse CSV
+    // Parse CSV - handle different line endings
+    $csvData = str_replace(["\r\n", "\r"], "\n", $csvData);
     $lines = explode("\n", trim($csvData));
-    $headers = str_getcsv(array_shift($lines));
+    
+    if (count($lines) < 2) {
+        respond(['error' => 'CSV file must have at least a header and one data row'], 400);
+    }
+    
+    $headerLine = array_shift($lines);
+    
+    // Auto-detect delimiter (tab or comma)
+    $delimiter = strpos($headerLine, "\t") !== false ? "\t" : ",";
+    
+    $headers = str_getcsv($headerLine, $delimiter);
+    
+    // Normalize headers (trim whitespace)
+    $headers = array_map('trim', $headers);
+    
+    // Filter out empty lines
+    $lines = array_filter($lines, function($line) {
+        return !empty(trim($line));
+    });
+    
+    if (count($lines) === 0) {
+        respond(['error' => 'No data rows found in CSV'], 400);
+    }
     
     if (count($lines) > MAX_IMPORT_ROWS) {
         respond(['error' => "Maximum " . MAX_IMPORT_ROWS . " rows allowed per import"], 400);
@@ -51,114 +74,219 @@ try {
     $failed = 0;
     $errors = [];
     
-    // Get existing asset codes
+    // Get existing asset codes for this institution
     $stmt = $db->prepare("SELECT asset_code FROM assets WHERE institution_id = ?");
     $stmt->execute([$institutionId]);
     $existingCodes = array_flip($stmt->fetchAll(PDO::FETCH_COLUMN));
     
     foreach ($lines as $lineNum => $line) {
-        if (empty(trim($line))) continue;
+        $rowNumber = $lineNum + 2; // +2 because we removed header and arrays are 0-indexed
         
-        $data = str_getcsv($line);
-        $row = array_combine($headers, $data);
+        $data = str_getcsv($line, $delimiter);
         
-        // Validate required fields
-        $requiredFields = ['asset_code', 'asset_name', 'category'];
-        $missingFields = [];
-        
-        foreach ($requiredFields as $field) {
-            if (!isset($row[$field]) || empty(trim($row[$field]))) {
-                $missingFields[] = $field;
-            }
+        // Pad array if needed
+        while (count($data) < count($headers)) {
+            $data[] = '';
         }
         
-        if (!empty($missingFields)) {
+        // Check if data count matches headers
+        if (count($data) > count($headers)) {
             $failed++;
             $errors[] = [
-                'line' => $lineNum + 2,
+                'line' => $rowNumber,
+                'error' => 'Too many columns in row'
+            ];
+            continue;
+        }
+        
+        $row = array_combine($headers, array_slice($data, 0, count($headers)));
+        
+        // Map CSV columns to expected field names
+        $assetCode = isset($row['Asset Code']) ? trim($row['Asset Code']) : '';
+        $assetName = isset($row['Name']) ? trim($row['Name']) : '';
+        $category = isset($row['Category']) ? trim($row['Category']) : '';
+        $serialNumber = isset($row['Serial Number']) ? trim($row['Serial Number']) : '';
+        $acquisitionDate = isset($row['Acquisition Date']) ? trim($row['Acquisition Date']) : '';
+        $acquisitionCost = isset($row['Acquisition Cost']) ? trim($row['Acquisition Cost']) : '';
+        $condition = isset($row['Condition']) ? trim($row['Condition']) : 'good';
+        $status = isset($row['Status']) ? trim($row['Status']) : 'available';
+        $location = isset($row['Location']) ? trim($row['Location']) : '';
+        $description = isset($row['Description']) ? trim($row['Description']) : '';
+        
+        // Normalize condition to lowercase
+        $condition = strtolower($condition);
+        if (!in_array($condition, ['good', 'fair', 'poor', 'excellent'])) {
+            $condition = 'good';
+        }
+        
+        // Normalize status to lowercase
+        $status = strtolower($status);
+        if (!in_array($status, ['available', 'on_loan', 'maintenance', 'retired'])) {
+            $status = 'available';
+        }
+        
+        // Validate required fields
+        if (empty($assetCode) || empty($assetName) || empty($category)) {
+            $failed++;
+            $missingFields = [];
+            if (empty($assetCode)) $missingFields[] = 'Asset Code';
+            if (empty($assetName)) $missingFields[] = 'Name';
+            if (empty($category)) $missingFields[] = 'Category';
+            
+            $errors[] = [
+                'line' => $rowNumber,
                 'error' => 'Missing required fields: ' . implode(', ', $missingFields)
             ];
             continue;
         }
         
         // Check for duplicate asset code
-        $assetCode = trim($row['asset_code']);
         if (isset($existingCodes[$assetCode])) {
             $failed++;
             $errors[] = [
-                'line' => $lineNum + 2,
+                'line' => $rowNumber,
                 'error' => "Asset code '{$assetCode}' already exists"
             ];
             continue;
         }
         
-        // Insert asset
+        // Parse and validate date - handle multiple formats
+        $finalAcquisitionDate = null;
+        if (!empty($acquisitionDate)) {
+            // Try different date formats
+            $dateFormats = ['Y-m-d', 'n/j/Y', 'd/m/Y', 'm/d/Y', 'j/n/Y'];
+            $dateObj = false;
+            
+            foreach ($dateFormats as $format) {
+                $dateObj = DateTime::createFromFormat($format, $acquisitionDate);
+                if ($dateObj !== false) {
+                    $finalAcquisitionDate = $dateObj->format('Y-m-d');
+                    break;
+                }
+            }
+            
+            if ($dateObj === false) {
+                $failed++;
+                $errors[] = [
+                    'line' => $rowNumber,
+                    'error' => "Invalid date format: '{$acquisitionDate}'. Use YYYY-MM-DD, MM/DD/YYYY, or DD/MM/YYYY"
+                ];
+                continue;
+            }
+        }
+        
+        // Parse acquisition cost
+        $finalAcquisitionCost = null;
+        if (!empty($acquisitionCost)) {
+            $finalAcquisitionCost = floatval(str_replace(',', '', $acquisitionCost));
+        }
+        
+        // Check if category exists as asset_type, create if not
+        $stmt = $db->prepare("
+            SELECT id FROM asset_types 
+            WHERE institution_id = ? AND LOWER(name) = LOWER(?)
+        ");
+        $stmt->execute([$institutionId, $category]);
+        $assetTypeId = $stmt->fetchColumn();
+        
+        if (!$assetTypeId) {
+            // Create new asset type
+            $stmt = $db->prepare("
+                INSERT INTO asset_types (institution_id, name, description) 
+                VALUES (?, ?, ?) 
+                RETURNING id
+            ");
+            $stmt->execute([
+                $institutionId, 
+                $category, 
+                'Auto-created from CSV import'
+            ]);
+            $assetTypeId = $stmt->fetchColumn();
+        }
+        
+        // Insert asset - matching your actual database schema
         try {
             $stmt = $db->prepare("
                 INSERT INTO assets (
                     institution_id, 
                     asset_code, 
-                    asset_name, 
-                    category,
+                    name,
+                    serial_number,
+                    asset_type_id,
                     description,
-                    purchase_date,
-                    purchase_cost,
-                    location,
+                    acquisition_date,
+                    acquisition_cost,
+                    condition,
                     status,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
             ");
             
-            $stmt->execute([
+            $result = $stmt->execute([
                 $institutionId,
                 $assetCode,
-                trim($row['asset_name']),
-                trim($row['category']),
-                isset($row['description']) ? trim($row['description']) : null,
-                isset($row['purchase_date']) ? trim($row['purchase_date']) : null,
-                isset($row['purchase_cost']) ? floatval($row['purchase_cost']) : null,
-                isset($row['location']) ? trim($row['location']) : null,
-                isset($row['status']) ? trim($row['status']) : 'active'
+                $assetName,
+                !empty($serialNumber) ? $serialNumber : null,
+                $assetTypeId,
+                !empty($description) ? $description : null,
+                $finalAcquisitionDate,
+                $finalAcquisitionCost,
+                $condition,
+                $status
             ]);
             
-            $existingCodes[$assetCode] = true;
-            $imported++;
+            if ($result) {
+                // Add to existing codes to prevent duplicates within the same import
+                $existingCodes[$assetCode] = true;
+                $imported++;
+            } else {
+                $failed++;
+                $errors[] = [
+                    'line' => $rowNumber,
+                    'error' => 'Failed to insert asset'
+                ];
+            }
             
         } catch (PDOException $e) {
             $failed++;
             $errors[] = [
-                'line' => $lineNum + 2,
+                'line' => $rowNumber,
                 'error' => 'Database error: ' . $e->getMessage()
             ];
         }
     }
     
-    // Log the import activity
-    $stmt = $db->prepare("
-        INSERT INTO activity_logs (user_id, action, details, created_at) 
-        VALUES (?, ?, ?, NOW())
-    ");
-    
-    $stmt->execute([
-        $userId,
-        'csv_import',
-        json_encode([
-            'institution_id' => $institutionId,
-            'institution_name' => $institution['name'],
-            'imported' => $imported,
-            'failed' => $failed
-        ])
-    ]);
+    // Log the import activity only if we have something to log
+    if ($imported > 0 || $failed > 0) {
+        $stmt = $db->prepare("
+            INSERT INTO audit_logs (user_id, action, entity_type, details, created_at) 
+            VALUES (?, ?, ?, ?, NOW())
+        ");
+        
+        $stmt->execute([
+            $userId,
+            'CSV_IMPORT',
+            'assets',
+            json_encode([
+                'institution_id' => $institutionId,
+                'institution_name' => $institution['name'],
+                'imported' => $imported,
+                'failed' => $failed,
+                'total_rows' => count($lines)
+            ])
+        ]);
+    }
     
     // Commit transaction
     $db->commit();
     
     respond([
         'success' => true,
-        'message' => "Import completed",
-        'imported' => $imported,
+        'message' => $imported > 0 ? "Import completed successfully" : "No assets were imported",
+        'imported_count' => $imported,
         'failed' => $failed,
+        'total_rows' => count($lines),
         'errors' => $errors
     ]);
     
@@ -170,3 +298,4 @@ try {
     
     respond(['error' => 'Import failed: ' . $e->getMessage()], 500);
 }
+?>

@@ -334,9 +334,6 @@ export default function SystemConfiguration() {
                     <button onClick={() => handleEditStatus(status)} className="action-btn edit">
                       <Edit2 size={16} />
                     </button>
-                    <button onClick={() => handleDeleteStatus(status.id)} className="action-btn delete">
-                      <Trash2 size={16} />
-                    </button>
                   </div>
                 </div>
               ))

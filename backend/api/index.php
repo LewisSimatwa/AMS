@@ -155,47 +155,77 @@ try {
             if (!isset($decoded['role']) || $decoded['role'] !== 'super_admin') {
                 respond(['error' => 'Access denied. Super admin privileges required.'], 403);
             }
-            
+
             // Route to appropriate super admin handler
             if ($path === '/super_admin/stats' && $method === 'GET') {
                 require __DIR__ . '/super_admin/stats.php';   
             } elseif ($path === '/super_admin/recent-actions' && $method === 'GET') {
                 require __DIR__ . '/super_admin/recent-actions.php';
-            } elseif ($path === '/super_admin/institutions' && in_array($method, ['GET', 'POST', 'PUT'])) {
+            } 
+            
+            // INSTITUTIONS ROUTES
+            elseif ($path === '/super_admin/institutions' && in_array($method, ['GET', 'POST', 'PUT'])) {
                 require __DIR__ . '/super_admin/institutions.php';
-            } elseif ($path === '/super_admin/assets' && $method === 'GET') {
+            } elseif ($path === '/super_admin/deactivate-institution' && $method === 'PUT') {
+                require __DIR__ . '/super_admin/institutions/deactivate.php';
+            } 
+            
+            // ADMIN MANAGEMENT ROUTES
+            elseif ($path === '/super_admin/institution-admins' && $method === 'GET') {
+                require __DIR__ . '/super_admin/institutions/admins.php';
+            } elseif ($path === '/super_admin/create-admin' && $method === 'POST') {
+                require __DIR__ . '/super_admin/create-admin.php';
+            } elseif ($path === '/super_admin/revoke-admin' && $method === 'DELETE') {
+                require __DIR__ . '/super_admin/institutions/revoke-admin.php';
+            } elseif ($path === '/super_admin/reset-admin-password' && $method === 'POST') {
+                require __DIR__ . '/super_admin/institutions/reset-admin-password.php';
+            } 
+            
+            // CSV ROUTES
+            elseif ($path === '/super_admin/csv/import.php' && $method === 'POST') {
+                require __DIR__ . '/super_admin/csv/import.php';
+            } elseif ($path === '/super_admin/csv/validate.php' && $method === 'POST') {
+                require __DIR__ . '/super_admin/csv/validate.php';
+            }
+            
+            // ASSET MANAGEMENT ROUTES
+            elseif ($path === '/super_admin/assets' && $method === 'GET') {
                 require __DIR__ . '/super_admin/assets.php';
             } elseif ($path === '/super_admin/force-retire' && $method === 'POST') {
                 require __DIR__ . '/super_admin/force-retire.php';
             } elseif ($path === '/super_admin/asset-history' && $method === 'GET') {
                 require __DIR__ . '/super_admin/asset-history.php';
-            } elseif ($path === '/super_admin/create-admin' && $method === 'POST') {
-                require __DIR__ . '/super_admin/create-admin.php';
-            } elseif ($path === '/super_admin/csv/validate' && $method === 'POST') {
-                require __DIR__ . '/super_admin/csv/validate.php';
-            } elseif ($path === '/super_admin/csv/import' && $method === 'POST') {
-                require __DIR__ . '/super_admin/csv/import.php';
-            }  elseif ($path === '/super_admin/audit-logs' && $method === 'GET') {
-                require __DIR__ . '/super_admin/audit-logs.php';
-            } elseif ($path === '/super_admin/users' && $method === 'GET') {
-                require __DIR__ . '/super_admin/users.php';
-            } elseif ($path === '/super_admin/system-config' && in_array($method, ['GET', 'PUT'])) {
-                require __DIR__ . '/super_admin/system-config.php';
-            } elseif ($path === '/super_admin/analytics' && $method === 'GET') {
-                require __DIR__ . '/super_admin/analytics.php';
-            } elseif ($path === '/super_admin/analytics-export' && $method === 'GET') {
+            } 
+            
+            // ANALYTICS ROUTES
+            elseif ($path === '/super_admin/analytics-export' && $method === 'POST') {
                 require __DIR__ . '/super_admin/analytics-export.php';
-            } elseif ($path === '/super_admin/audit-logs' && $method === 'GET') {
-                require __DIR__ . '/super_admin/audit-logs.php';
-            } elseif ($path === '/super_admin/audit-logs-export' && $method === 'GET') {
-                require __DIR__ . '/super_admin/audit-logs-export.php';
-            } elseif ($path === '/super_admin/admins' && $method === 'GET') {
-                require __DIR__ . '/super_admin/admins.php';
-            } else {
-                respond(['error' => 'Super admin route not found: ' . $path], 404);
+            } elseif ($path === '/super_admin/analytics-export.php' && $method === 'POST') {
+                require __DIR__ . '/super_admin/analytics-export.php';
             }
             
+            // AUDIT LOGS
+            elseif ($path === '/super_admin/audit-logs-export' && $method === 'POST') {
+                require __DIR__ . '/super_admin/audit-logs-export.php';
+            } elseif ($path === '/super_admin/audit-logs-export.php' && $method === 'POST') {
+                require __DIR__ . '/super_admin/audit-logs-export.php';
+            }
+            
+            // SYSTEM CONFIG
+            elseif ($path === '/super_admin/system-config' && in_array($method, ['GET', 'POST'])) {
+                require __DIR__ . '/super_admin/system-config.php';
+            }
+            
+            // USERS
+            elseif ($path === '/super_admin/users' && $method === 'GET') {
+                require __DIR__ . '/super_admin/users.php';
+            }
+            
+            else {
+                respond(['error' => 'Super admin route not found: ' . $path], 404);
+            }
         }
+
 
         // ----------------------------------------
         // 404 - ROUTE NOT FOUND

@@ -71,7 +71,7 @@ export default function SuperAdminLayout() {
     {
       path: "/super-admin/reports",
       icon: Shield,
-      label: "Reports"
+      label: "Reports and Audits"
     },
     {
       path: "/super-admin/settings",
