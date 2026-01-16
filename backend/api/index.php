@@ -158,7 +158,7 @@ try {
             
             // Route to appropriate super admin handler
             if ($path === '/super_admin/stats' && $method === 'GET') {
-                require __DIR__ . '/super_admin/stats.php';
+                require __DIR__ . '/super_admin/stats.php';   
             } elseif ($path === '/super_admin/recent-actions' && $method === 'GET') {
                 require __DIR__ . '/super_admin/recent-actions.php';
             } elseif ($path === '/super_admin/institutions' && in_array($method, ['GET', 'POST', 'PUT'])) {
@@ -171,9 +171,20 @@ try {
                 require __DIR__ . '/super_admin/asset-history.php';
             } elseif ($path === '/super_admin/create-admin' && $method === 'POST') {
                 require __DIR__ . '/super_admin/create-admin.php';
+            } elseif ($path === '/super_admin/csv/validate' && $method === 'POST') {
+                require __DIR__ . '/super_admin/csv/validate.php';
+            } elseif ($path === '/super_admin/csv/import' && $method === 'POST') {
+                require __DIR__ . '/super_admin/csv/import.php';
+            }  elseif ($path === '/super_admin/audit-logs' && $method === 'GET') {
+                require __DIR__ . '/super_admin/audit-logs.php';
+            } elseif ($path === '/super_admin/users' && $method === 'GET') {
+                require __DIR__ . '/super_admin/users.php';
+            } elseif ($path === '/super-admin/system-config' && in_array($method, ['GET', 'PUT'])) {
+                require __DIR__ . '/super-admin/system-config.php';
             } else {
                 respond(['error' => 'Super admin route not found: ' . $path], 404);
             }
+            
         }
 
         // ----------------------------------------

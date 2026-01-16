@@ -7,7 +7,11 @@ import {
   LogOut, 
   Menu, 
   X,
-  Shield
+  Shield,
+  Import,
+  Settings2Icon,
+  SettingsIcon,
+  LineSquiggleIcon
 } from "lucide-react";
 import "../styles/SuperAdmin/layout.css";
 
@@ -58,6 +62,26 @@ export default function SuperAdminLayout() {
       path: "/super-admin/assets",
       icon: Package,
       label: "Global Assets"
+    },
+    {
+      path: "/super-admin/importcsv",
+      icon: Import,
+      label: "Import CSV"
+    },
+    {
+      path: "/super-admin/reports",
+      icon: Shield,
+      label: "Reports"
+    },
+    {
+      path: "/super-admin/.",
+      icon: LineSquiggleIcon,
+      label: "Audit logs"
+    },
+    {
+      path: "/super-admin/settings",
+      icon: SettingsIcon,
+      label: "System Settings"
     }
   ];
 

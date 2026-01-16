@@ -18,9 +18,11 @@ import RetireAsset from "./features/assets/RetireAsset";
 import SuperAdminLayout from './layouts/SuperAdminLayout';
 import SuperAdminDashboard from './features/superAdmin/Dashboard';
 import SuperAdminInstitutions from './features/superAdmin/Institutions';
+import SuperAdminImportCSV from './features/superAdmin/ImportCSV';
 //import SuperAdminUsers from './features/superAdmin/Users';
 import SuperAdminAssets from './features/superAdmin/Assets';
-//import SuperAdminReports from './features/superAdmin/Reports';
+import SuperAdminReports from './features/superAdmin/Reports';
+import SuperAdminSettings from './features/superAdmin/Settings';
 
 
 
@@ -54,9 +56,11 @@ export default function AppRouter() {
             <Route index element={<SuperAdminDashboard />} />
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="institutions" element={<SuperAdminInstitutions />} />
+            <Route path="importcsv" element={<SuperAdminImportCSV />} />
             {/*<Route path="users" element={<SuperAdminUsers />} />*/}
             <Route path="assets" element={<SuperAdminAssets />} />
-            {/*<Route path="reports" element={<SuperAdminReports />} />*/}
+            <Route path="reports" element={<SuperAdminReports />} />
+            <Route path="settings" element={<SuperAdminSettings />} />
           </Route>
         </Route>
       </Routes>
