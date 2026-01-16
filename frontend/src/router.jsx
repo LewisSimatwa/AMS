@@ -19,11 +19,9 @@ import SuperAdminLayout from './layouts/SuperAdminLayout';
 import SuperAdminDashboard from './features/superAdmin/Dashboard';
 import SuperAdminInstitutions from './features/superAdmin/Institutions';
 import SuperAdminImportCSV from './features/superAdmin/ImportCSV';
-//import SuperAdminUsers from './features/superAdmin/Users';
 import SuperAdminAssets from './features/superAdmin/Assets';
-import SuperAdminReports from './features/superAdmin/Reports';
+import SuperAdminReportsAndAudits from './features/superAdmin/ReportsAndAudit';
 import SuperAdminSettings from './features/superAdmin/Settings';
-
 
 
 export default function AppRouter() {
@@ -57,9 +55,8 @@ export default function AppRouter() {
             <Route path="dashboard" element={<SuperAdminDashboard />} />
             <Route path="institutions" element={<SuperAdminInstitutions />} />
             <Route path="importcsv" element={<SuperAdminImportCSV />} />
-            {/*<Route path="users" element={<SuperAdminUsers />} />*/}
             <Route path="assets" element={<SuperAdminAssets />} />
-            <Route path="reports" element={<SuperAdminReports />} />
+            <Route path="reports" element={<SuperAdminReportsAndAudits />} />
             <Route path="settings" element={<SuperAdminSettings />} />
           </Route>
         </Route>

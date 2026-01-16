@@ -179,8 +179,18 @@ try {
                 require __DIR__ . '/super_admin/audit-logs.php';
             } elseif ($path === '/super_admin/users' && $method === 'GET') {
                 require __DIR__ . '/super_admin/users.php';
-            } elseif ($path === '/super-admin/system-config' && in_array($method, ['GET', 'PUT'])) {
-                require __DIR__ . '/super-admin/system-config.php';
+            } elseif ($path === '/super_admin/system-config' && in_array($method, ['GET', 'PUT'])) {
+                require __DIR__ . '/super_admin/system-config.php';
+            } elseif ($path === '/super_admin/analytics' && $method === 'GET') {
+                require __DIR__ . '/super_admin/analytics.php';
+            } elseif ($path === '/super_admin/analytics-export' && $method === 'GET') {
+                require __DIR__ . '/super_admin/analytics-export.php';
+            } elseif ($path === '/super_admin/audit-logs' && $method === 'GET') {
+                require __DIR__ . '/super_admin/audit-logs.php';
+            } elseif ($path === '/super_admin/audit-logs-export' && $method === 'GET') {
+                require __DIR__ . '/super_admin/audit-logs-export.php';
+            } elseif ($path === '/super_admin/admins' && $method === 'GET') {
+                require __DIR__ . '/super_admin/admins.php';
             } else {
                 respond(['error' => 'Super admin route not found: ' . $path], 404);
             }

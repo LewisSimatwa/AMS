@@ -13,6 +13,7 @@ import {
   FileText,
   Lock
 } from "lucide-react";
+import "../../styles/SuperAdmin/Settings.css";
 
 export default function SystemConfiguration() {
   const [loading, setLoading] = useState(true);

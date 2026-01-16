@@ -42,7 +42,7 @@ try {
                 FROM institutions i
                 LEFT JOIN users u ON i.id = u.institution_id
                 LEFT JOIN assets a ON i.id = a.institution_id
-                GROUP BY i.id
+                GROUP BY i.id, i.name, i.code, i.address, i.contact_email, i.created_at, i.updated_at
                 ORDER BY i.name ASC
             ");
 

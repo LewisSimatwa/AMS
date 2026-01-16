@@ -148,19 +148,6 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
 
-        <div className="stat-card stat-card-purple">
-          <div className="stat-card-content">
-            <div className="stat-card-info">
-              <p className="stat-card-label">Total Users</p>
-              <p className="stat-card-value">{stats.totalUsers}</p>
-              <p className="stat-card-subtext" style={{color: '#6b7280'}}>Across all institutions</p>
-            </div>
-            <div className="stat-card-icon icon-purple">
-              <Users size={24} />
-            </div>
-          </div>
-        </div>
-
         <div className="stat-card stat-card-orange">
           <div className="stat-card-content">
             <div className="stat-card-info">
@@ -170,6 +157,19 @@ export default function SuperAdminDashboard() {
             </div>
             <div className="stat-card-icon icon-orange">
               <Activity size={24} />
+            </div>
+          </div>
+        </div>
+
+        <div className="stat-card stat-card-purple">
+          <div className="stat-card-content">
+            <div className="stat-card-info">
+              <p className="stat-card-label">Total Users</p>
+              <p className="stat-card-value">{stats.totalUsers}</p>
+              <p className="stat-card-subtext" style={{color: '#6b7280'}}>Across all institutions</p>
+            </div>
+            <div className="stat-card-icon icon-purple">
+              <Users size={24} />
             </div>
           </div>
         </div>

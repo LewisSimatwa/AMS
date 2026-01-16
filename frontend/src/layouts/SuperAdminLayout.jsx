@@ -74,11 +74,6 @@ export default function SuperAdminLayout() {
       label: "Reports"
     },
     {
-      path: "/super-admin/.",
-      icon: LineSquiggleIcon,
-      label: "Audit logs"
-    },
-    {
       path: "/super-admin/settings",
       icon: SettingsIcon,
       label: "System Settings"

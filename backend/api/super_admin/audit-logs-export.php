@@ -1,5 +1,5 @@
 <?php
-// api/super_admin/audit-logs.php
+// api/super-admin/audit-logs-export.php
 require __DIR__ . '/../cors.php';
 require __DIR__ . '/../config.php';
 require __DIR__ . '/../helpers.php';
@@ -11,11 +11,7 @@ if (!isset($decoded['role']) || $decoded['role'] !== 'super_admin') {
 }
 
 try {
-    // Get filter parameters
-    $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 50;
-    $offset = ($page - 1) * $limit;
-
+    // Get filter parameters (same as audit-logs.php)
     $institution_id = isset($_GET['institution_id']) ? $_GET['institution_id'] : null;
     $user_id = isset($_GET['user_id']) ? $_GET['user_id'] : null;
     $action_type = isset($_GET['action_type']) ? $_GET['action_type'] : null;
@@ -65,68 +61,77 @@ try {
 
     $whereClause = count($where) > 0 ? 'WHERE ' . implode(' AND ', $where) : '';
 
-    // Get total count
-    $countSql = "SELECT COUNT(*) as total 
-                 FROM audit_logs al
-                 LEFT JOIN users u ON al.user_id = u.id
-                 LEFT JOIN institutions i ON al.institution_id = i.id
-                 $whereClause";
-    
-    $stmt = $db->prepare($countSql);
-    $stmt->execute($params);
-    $total = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
-
-    // Get logs
+    // Get all logs (no limit for export)
     $sql = "SELECT 
                 al.id,
+                al.created_at as timestamp,
+                u.username,
+                i.name as institution,
                 al.action,
                 al.entity_type,
                 al.entity_id,
                 al.old_values,
                 al.new_values,
-                al.details,
-                al.created_at,
-                u.username,
-                i.name as institution_name
+                al.details
             FROM audit_logs al
             LEFT JOIN users u ON al.user_id = u.id
             LEFT JOIN institutions i ON al.institution_id = i.id
             $whereClause
-            ORDER BY al.created_at DESC
-            LIMIT :limit OFFSET :offset";
+            ORDER BY al.created_at DESC";
 
     $stmt = $db->prepare($sql);
-    foreach ($params as $key => $value) {
-        $stmt->bindValue($key, $value);
-    }
-    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-    $stmt->execute();
-
+    $stmt->execute($params);
     $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Parse JSON fields
-    foreach ($logs as &$log) {
-        if ($log['old_values']) {
-            $log['old_values'] = json_decode($log['old_values'], true);
-        }
-        if ($log['new_values']) {
-            $log['new_values'] = json_decode($log['new_values'], true);
-        }
-        if ($log['details']) {
-            $log['details'] = json_decode($log['details'], true);
-        }
-    }
+    // Set CSV headers
+    header('Content-Type: text/csv');
+    header('Content-Disposition: attachment; filename="audit_logs_' . date('Y-m-d') . '.csv"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
 
-    respond([
-        'logs' => $logs,
-        'total' => (int)$total,
-        'page' => $page,
-        'limit' => $limit
+    // Open output stream
+    $output = fopen('php://output', 'w');
+
+    // Write CSV header
+    fputcsv($output, [
+        'ID',
+        'Timestamp',
+        'User',
+        'Institution',
+        'Action',
+        'Entity Type',
+        'Entity ID',
+        'Old Values',
+        'New Values',
+        'Details'
     ]);
 
+    // Write data rows
+    foreach ($logs as $log) {
+        // Format JSON fields for CSV
+        $oldValues = $log['old_values'] ? json_encode(json_decode($log['old_values']), JSON_UNESCAPED_SLASHES) : '';
+        $newValues = $log['new_values'] ? json_encode(json_decode($log['new_values']), JSON_UNESCAPED_SLASHES) : '';
+        $details = $log['details'] ? json_encode(json_decode($log['details']), JSON_UNESCAPED_SLASHES) : '';
+
+        fputcsv($output, [
+            $log['id'],
+            $log['timestamp'],
+            $log['username'] ?: 'System',
+            $log['institution'] ?: 'N/A',
+            $log['action'],
+            $log['entity_type'],
+            $log['entity_id'] ?: '',
+            $oldValues,
+            $newValues,
+            $details
+        ]);
+    }
+
+    fclose($output);
+    exit;
+
 } catch (Exception $e) {
-    error_log('Audit logs error: ' . $e->getMessage());
-    respond(['error' => 'Failed to fetch audit logs'], 500);
+    error_log('Export audit logs error: ' . $e->getMessage());
+    respond(['error' => 'Failed to export audit logs'], 500);
 }
 ?>

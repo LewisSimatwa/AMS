@@ -17,16 +17,16 @@ try {
         respond(['error' => 'Asset ID required'], 400);
     }
 
-    // Get asset history from audit log
+    // Get asset history from audit_logs table
     $stmt = $db->prepare("SELECT 
-                         al.action_type as action,
-                         al.description,
-                         al.timestamp,
+                         al.action,
+                         al.details::text as description,
+                         al.created_at as timestamp,
                          CONCAT(u.first_name, ' ', u.last_name) as user_name
-                         FROM audit_log al
-                         JOIN users u ON al.user_id = u.id
-                         WHERE al.entity_type = 'asset' AND al.entity_id = ?
-                         ORDER BY al.timestamp DESC
+                         FROM audit_logs al
+                         LEFT JOIN users u ON al.user_id = u.id
+                         WHERE al.entity_type = 'assets' AND al.entity_id = ?
+                         ORDER BY al.created_at DESC
                          LIMIT 50");
     
     $stmt->execute([$assetId]);
