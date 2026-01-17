@@ -74,7 +74,7 @@ export default function Sidebar({ isOpen, setIsOpen, user, onLogout }) {
             <div className="user-avatar">{(user?.email?.[0] || "U").toUpperCase()}</div>
             <div className="user-info">
               <div className="user-name">{user?.email || "User"}</div>
-              <div className="user-role">{user?.role || "Free plan"}</div>
+              <div className="user-role">{user?.role || "-"}</div>
             </div>
           </div>
           <button className="logout-btn" onClick={handleLogout}>🚪 Logout</button>

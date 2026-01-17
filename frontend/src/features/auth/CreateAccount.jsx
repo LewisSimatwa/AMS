@@ -1,25 +1,19 @@
 import { useState } from "react";
-import { Mail, Lock, UserPlus, Building } from "lucide-react";
+import { Mail, Lock, UserPlus, User } from "lucide-react";
 import { createUser } from "../../api/auth"; 
 import "../../styles/AuthPages.css";
 
 export default function CreateAccount() {
   const [form, setForm] = useState({
-    fullName: "",
+    firstName: "",
+    lastName: "",
     email: "",
     password: "",
-    confirmPassword: "",
-    institution_id: ""
+    confirmPassword: ""
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
-  const institutions = [
-    { id: "1", name: "Nairobi University" },
-    { id: "2", name: "Kampala Institute of Technology" },
-    { id: "3", name: "Dar es Salaam Polytechnic" }
-  ];
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -36,8 +30,11 @@ export default function CreateAccount() {
 
     try {
       // Validation
-      if (!form.institution_id) {
-        throw new Error("Please select an institution");
+      if (!form.firstName.trim()) {
+        throw new Error("Please enter your first name");
+      }
+      if (!form.lastName.trim()) {
+        throw new Error("Please enter your last name");
       }
       if (!form.email) {
         throw new Error("Please enter your email");
@@ -54,21 +51,18 @@ export default function CreateAccount() {
       if (form.password !== form.confirmPassword) {
         throw new Error("Passwords do not match");
       }
-      if (!form.fullName.trim()) {
-        throw new Error("Please enter your full name");
-      }
 
-      // Send data to backend - let backend handle name parsing
+      // Send data to backend - backend will validate domain
       const message = await createUser({
-        institution_id: parseInt(form.institution_id),
-        fullName: form.fullName.trim(),
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
         email: form.email.trim(),
         password: form.password
       });
 
       // Show success message
       setSuccess(message || "Account created successfully! Redirecting to login...");
-      setForm({ fullName: "", email: "", password: "", confirmPassword: "", institution_id: "" });
+      setForm({ firstName: "", lastName: "", email: "", password: "", confirmPassword: "" });
 
       // Redirect to login after 2 seconds
       setTimeout(() => {
@@ -126,17 +120,35 @@ export default function CreateAccount() {
             )}
 
             <form onSubmit={handleSubmit} className="form-content">
-              {/* Full Name */}
+              {/* First Name */}
               <div className="form-field">
-                <label className="field-label">Full Name</label>
+                <label className="field-label">First Name</label>
+                <div className="input-group">
+                  <User className="input-icon" />
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={form.firstName}
+                    onChange={handleChange}
+                    placeholder="Your first name"
+                    className="input-field"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              {/* Last Name */}
+              <div className="form-field">
+                <label className="field-label">Last Name</label>
                 <div className="input-group">
                   <UserPlus className="input-icon" />
                   <input
                     type="text"
-                    name="fullName"
-                    value={form.fullName}
+                    name="lastName"
+                    value={form.lastName}
                     onChange={handleChange}
-                    placeholder="Your full name"
+                    placeholder="Your last name"
                     className="input-field"
                     required
                     disabled={loading}
@@ -154,12 +166,13 @@ export default function CreateAccount() {
                     name="email"
                     value={form.email}
                     onChange={handleChange}
-                    placeholder="you@example.com"
+                    placeholder="you@yourinstitution.edu"
                     className="input-field"
                     required
                     disabled={loading}
                   />
                 </div>
+                <p className="field-hint">Use your institutional email address</p>
               </div>
 
               {/* Password */}
@@ -196,29 +209,6 @@ export default function CreateAccount() {
                     required
                     disabled={loading}
                   />
-                </div>
-              </div>
-
-              {/* Institution */}
-              <div className="form-field">
-                <label className="field-label">Institution</label>
-                <div className="input-group">
-                  <Building className="input-icon" />
-                  <select
-                    name="institution_id"
-                    value={form.institution_id}
-                    onChange={handleChange}
-                    className="input-field"
-                    required
-                    disabled={loading}
-                  >
-                    <option value="">Select your institution</option>
-                    {institutions.map(inst => (
-                      <option key={inst.id} value={inst.id}>
-                        {inst.name}
-                      </option>
-                    ))}
-                  </select>
                 </div>
               </div>
 
