@@ -1,58 +1,54 @@
 import { useState, useEffect } from "react";
-import { 
-  FileText, 
-  Filter, 
-  Download, 
-  Search, 
-  Calendar, 
-  User, 
-  Building2, 
-  Activity,
-  TrendingUp,
-  BarChart3,
-  PieChart as PieChartIcon,
-  Award,
-  AlertCircle
-} from "lucide-react";
-import { 
-  LineChart, 
-  Line, 
-  BarChart, 
-  Bar, 
-  PieChart, 
-  Pie, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
   Cell,
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer 
+  LineChart,
+  Line
 } from "recharts";
 import "../../styles/SuperAdmin/ReportsAndAudit.css";
 
 export default function ReportsAndAudit() {
-  const [activeSection, setActiveSection] = useState("analytics");
-  
-  // Analytics State
-  const [analyticsData, setAnalyticsData] = useState({
-    assetGrowth: [],
-    retirementStats: {},
-    institutionComparison: [],
-    adminActivity: [],
+  const [activeTab, setActiveTab] = useState("analytics");
+  const [loading, setLoading] = useState(true);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [error, setError] = useState("");
+
+  const token = localStorage.getItem("token");
+  const headers = { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" };
+
+  // Analytics State with proper defaults
+  const [analytics, setAnalytics] = useState({
     totalAssets: 0,
     activeAssets: 0,
-    retiredAssets: 0
+    retiredAssets: 0,
+    totalUsers: 0,
+    totalInstitutions: 0,
+    statusStats: {
+      available: 0,
+      on_loan: 0,
+      maintenance: 0,
+      retired: 0
+    },
+    institutionComparison: [],
+    adminActivity: [],
+    assetTypeDistribution: [],
+    recentActivities: []
   });
 
   // Audit Logs State
-  const [logs, setLogs] = useState([]);
-  const [institutions, setInstitutions] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const [filters, setFilters] = useState({
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditFilters, setAuditFilters] = useState({
     institution_id: "",
     user_id: "",
     action_type: "",
@@ -62,176 +58,207 @@ export default function ReportsAndAudit() {
     search: ""
   });
 
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 50,
-    total: 0
-  });
-
-  const actionTypes = [
-    "LOGIN", "CREATE", "UPDATE", "DELETE", "CHECK_OUT", 
-    "CHECK_IN", "TRANSFER", "RETIRE", "PASSWORD_RESET", "REVOKE_ADMIN"
-  ];
-  
-  const entityTypes = [
-    "assets", "users", "institutions", "maintenance_records", 
-    "transactions", "auth"
-  ];
-
-  const COLORS = ['#667eea', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+  // Users and Institutions for filters
+  const [users, setUsers] = useState([]);
+  const [institutions, setInstitutions] = useState([]);
 
   useEffect(() => {
-    fetchInstitutions();
+    fetchAnalytics();
+    fetchAuditLogs();
     fetchUsers();
-    if (activeSection === "analytics") {
-      fetchAnalyticsData();
-    } else {
-      fetchLogs();
-    }
-  }, [activeSection, filters, pagination.page]);
+    fetchInstitutions();
+  }, []);
 
-  const fetchInstitutions = async () => {
+  // Fetch Analytics
+  async function fetchAnalytics() {
+    setLoadingAnalytics(true);
+    setError("");
+    
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8000/api/super_admin/institutions", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      const response = await fetch("http://localhost:8000/api/super_admin/analytics", { headers });
 
-      if (response.ok) {
-        const data = await response.json();
-        setInstitutions(data.institutions || []);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to fetch analytics");
       }
-    } catch (err) {
-      console.error("Failed to fetch institutions:", err);
-    }
-  };
 
-  const fetchUsers = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8000/api/super_admin/admins", {
-        headers: { "Authorization": `Bearer ${token}` }
+      const data = await response.json();
+      
+      // Set analytics with proper defaults and validation
+      setAnalytics({
+        totalAssets: Number(data.totalAssets) || 0,
+        activeAssets: Number(data.activeAssets) || 0,
+        retiredAssets: Number(data.retiredAssets) || 0,
+        totalUsers: Number(data.totalUsers) || 0,
+        totalInstitutions: Number(data.totalInstitutions) || 0,
+        statusStats: {
+          available: Number(data.statusStats?.available) || 0,
+          on_loan: Number(data.statusStats?.on_loan) || 0,
+          maintenance: Number(data.statusStats?.maintenance) || 0,
+          retired: Number(data.statusStats?.retired) || 0
+        },
+        institutionComparison: Array.isArray(data.institutionComparison) 
+          ? data.institutionComparison 
+          : [],
+        adminActivity: Array.isArray(data.adminActivity) 
+          ? data.adminActivity 
+          : [],
+        assetTypeDistribution: Array.isArray(data.assetTypeDistribution) 
+          ? data.assetTypeDistribution 
+          : [],
+        recentActivities: Array.isArray(data.recentActivities) 
+          ? data.recentActivities 
+          : []
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data.admins || []);
-      }
+      
     } catch (err) {
-      console.error("Failed to fetch users:", err);
+      console.error("Fetch analytics error:", err);
+      setError(err.message || "Failed to load analytics");
+    } finally {
+      setLoadingAnalytics(false);
+      setLoading(false);
     }
-  };
+  }
 
-  const fetchAnalyticsData = async () => {
+  // Fetch Audit Logs
+  async function fetchAuditLogs(page = 1) {
     setLoading(true);
     setError("");
 
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8000/api/super_admin/analytics", {
-        headers: { "Authorization": `Bearer ${token}` }
+      // Build params - remove institution_id filter to get ALL activities
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: "50"
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch analytics data");
-      }
+      // Only add filters if they have values
+      if (auditFilters.user_id) params.append('user_id', auditFilters.user_id);
+      if (auditFilters.action_type) params.append('action_type', auditFilters.action_type);
+      if (auditFilters.entity_type) params.append('entity_type', auditFilters.entity_type);
+      if (auditFilters.date_from) params.append('date_from', auditFilters.date_from);
+      if (auditFilters.date_to) params.append('date_to', auditFilters.date_to);
+      if (auditFilters.search) params.append('search', auditFilters.search);
+      // Allow filtering by institution if selected, but don't require it
+      if (auditFilters.institution_id) params.append('institution_id', auditFilters.institution_id);
 
-      const data = await response.json();
-      setAnalyticsData(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchLogs = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const token = localStorage.getItem("token");
-      const queryParams = new URLSearchParams({
-        page: pagination.page,
-        limit: pagination.limit,
-        ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ""))
-      });
-
-      const response = await fetch(`http://localhost:8000/api/super_admin/audit-logs?${queryParams}`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch audit logs");
-      }
-
-      const data = await response.json();
-      setLogs(data.logs || []);
-      setPagination(prev => ({ ...prev, total: data.total || 0 }));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const exportAnalyticsReport = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch("http://localhost:8000/api/super_admin/analytics/export", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to export report");
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `analytics_report_${new Date().toISOString().split('T')[0]}.pdf`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const exportAuditLogs = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const queryParams = new URLSearchParams(
-        Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ""))
+      const response = await fetch(
+        `http://localhost:8000/api/super_admin/audit-logs?${params}`,
+        { headers }
       );
 
-      const response = await fetch(`http://localhost:8000/api/super_admin/audit-logs/export?${queryParams}`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-
       if (!response.ok) {
-        throw new Error("Failed to export logs");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to fetch audit logs");
       }
+
+      const data = await response.json();
+      setAuditLogs(data.logs || []);
+      setAuditTotal(data.total || 0);
+      setAuditPage(page);
+    } catch (err) {
+      console.error("Fetch audit logs error:", err);
+      setError(err.message || "Failed to load audit logs");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Fetch Users
+  async function fetchUsers() {
+    try {
+      const response = await fetch("http://localhost:8000/api/super_admin/admins", { headers });
+
+      if (!response.ok) throw new Error("Failed to fetch users");
+      
+      const data = await response.json();
+      setUsers(data.admins || []);
+    } catch (err) {
+      console.error("Fetch users error:", err);
+    }
+  }
+
+  // Fetch Institutions
+  async function fetchInstitutions() {
+    try {
+      const response = await fetch("http://localhost:8000/api/super_admin/institutions", { headers });
+
+      if (!response.ok) throw new Error("Failed to fetch institutions");
+      
+      const data = await response.json();
+      setInstitutions(data.institutions || []);
+    } catch (err) {
+      console.error("Fetch institutions error:", err);
+    }
+  }
+
+  // Export Analytics
+  async function exportAnalytics() {
+    try {
+      const response = await fetch("http://localhost:8000/api/super_admin/analytics-export", { headers });
+
+      if (!response.ok) throw new Error("Failed to export analytics");
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `audit_logs_${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `analytics_${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (err) {
-      setError(err.message);
+      console.error("Export analytics error:", err);
+      alert("Failed to export analytics: " + err.message);
     }
-  };
+  }
 
-  const handleFilterChange = (key, value) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-    setPagination(prev => ({ ...prev, page: 1 }));
-  };
+  // Export Audit Logs
+  async function exportAuditLogs() {
+    try {
+      const params = new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(auditFilters).filter(([_, v]) => v !== "")
+        )
+      );
 
-  const clearFilters = () => {
-    setFilters({
+      const response = await fetch(
+        `http://localhost:8000/api/super_admin/audit-logs-export?${params}`,
+        { headers }
+      );
+
+      if (!response.ok) throw new Error("Failed to export audit logs");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `audit_logs_${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error("Export audit logs error:", err);
+      alert("Failed to export audit logs: " + err.message);
+    }
+  }
+
+  // Handle filter change
+  function handleFilterChange(e) {
+    const { name, value } = e.target;
+    setAuditFilters(prev => ({ ...prev, [name]: value }));
+  }
+
+  // Apply filters
+  function applyFilters() {
+    fetchAuditLogs(1);
+  }
+
+  // Clear filters
+  function clearFilters() {
+    setAuditFilters({
       institution_id: "",
       user_id: "",
       action_type: "",
@@ -240,465 +267,396 @@ export default function ReportsAndAudit() {
       date_to: "",
       search: ""
     });
-    setPagination(prev => ({ ...prev, page: 1 }));
-  };
+    fetchAuditLogs(1);
+  }
 
-  const getActionColor = (action) => {
-    const colors = {
-      CREATE: "action-create",
-      UPDATE: "action-update",
-      DELETE: "action-delete",
-      LOGIN: "action-login",
-      CHECK_OUT: "action-checkout",
-      CHECK_IN: "action-checkin",
-      TRANSFER: "action-transfer",
-      RETIRE: "action-retire",
-      PASSWORD_RESET: "action-reset",
-      REVOKE_ADMIN: "action-revoke"
-    };
-    return colors[action] || "action-default";
-  };
+  // Chart data preparation
+  const pieChartData = [
+    { 
+      name: "Available", 
+      value: analytics.statusStats?.available || 0, 
+      color: "#10b981" 
+    },
+    { 
+      name: "On Loan", 
+      value: analytics.statusStats?.on_loan || 0, 
+      color: "#f59e0b" 
+    },
+    { 
+      name: "Maintenance", 
+      value: analytics.statusStats?.maintenance || 0, 
+      color: "#ef4444" 
+    },
+    { 
+      name: "Retired", 
+      value: analytics.statusStats?.retired || 0, 
+      color: "#6b7280" 
+    }
+  ];
+
+  const barChartData = analytics.institutionComparison.map(inst => ({
+    name: inst.name,
+    total: inst.total_assets || 0,
+    active: inst.active_assets || 0,
+    retired: inst.retired_assets || 0
+  }));
+
+  if (loading && activeTab === "analytics") {
+    return (
+      <div className="reports-page">
+        <div className="loading-spinner">Loading...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="reports-audit-container">
-      {/* Header */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">
-            <BarChart3 size={32} />
-            Reports & Audit Center
-          </h1>
-          <p className="page-subtitle">System analytics and activity monitoring</p>
-        </div>
-      </div>
-
-      {/* Section Toggle */}
-      <div className="section-toggle">
-        <button
-          className={`toggle-btn ${activeSection === "analytics" ? "active" : ""}`}
-          onClick={() => setActiveSection("analytics")}
-        >
-          <TrendingUp size={20} />
-          Analytics & Reports
-        </button>
-        <button
-          className={`toggle-btn ${activeSection === "audit" ? "active" : ""}`}
-          onClick={() => setActiveSection("audit")}
-        >
-          <FileText size={20} />
-          Audit Logs
-        </button>
+    <div className="reports-page">
+      <div className="reports-header">
+        <h1>📊 Reports & Analytics</h1>
+        <p>System-wide insights and audit trails</p>
       </div>
 
       {error && (
         <div className="error-banner">
-          <AlertCircle size={20} />
-          {error}
-          <button onClick={() => setError("")} className="close-error">×</button>
+          <p>{error}</p>
+          <button onClick={() => setError("")}>Dismiss</button>
         </div>
       )}
 
-      {/* Analytics Section */}
-      {activeSection === "analytics" && (
+      {/* Tabs */}
+      <div className="tabs">
+        <button
+          className={activeTab === "analytics" ? "tab active" : "tab"}
+          onClick={() => setActiveTab("analytics")}
+        >
+          Analytics
+        </button>
+        <button
+          className={activeTab === "audit" ? "tab active" : "tab"}
+          onClick={() => setActiveTab("audit")}
+        >
+          Audit Logs
+        </button>
+      </div>
+
+      {/* Analytics Tab */}
+      {activeTab === "analytics" && (
         <div className="analytics-section">
-          <div className="section-header">
-            <h2>System Analytics & Intelligence</h2>
-            <button onClick={exportAnalyticsReport} className="export-pdf-btn">
-              <Download size={18} />
-              Export PDF Report
+          <div className="analytics-actions">
+            <button onClick={fetchAnalytics} className="refresh-btn">
+              🔄 Refresh
+            </button>
+            <button onClick={exportAnalytics} className="export-btn">
+              📥 Export CSV
             </button>
           </div>
 
-          {loading ? (
-            <div className="loading-container">
-              <div className="spinner"></div>
-              <p>Loading analytics...</p>
+          {/* Summary Cards */}
+          <div className="summary-cards">
+            <div className="summary-card">
+              <h3>{analytics.totalAssets}</h3>
+              <p>Total Assets</p>
             </div>
-          ) : (
-            <>
-              {/* Summary Cards */}
-              <div className="summary-grid">
-                <div className="summary-card card-blue">
-                  <div className="card-icon">
-                    <Activity size={32} />
-                  </div>
-                  <div className="card-content">
-                    <p className="card-label">Total Assets</p>
-                    <p className="card-value">{analyticsData.totalAssets}</p>
-                  </div>
-                </div>
+            <div className="summary-card">
+              <h3>{analytics.activeAssets}</h3>
+              <p>Active Assets</p>
+            </div>
+            <div className="summary-card">
+              <h3>{analytics.retiredAssets}</h3>
+              <p>Retired Assets</p>
+            </div>
+            <div className="summary-card">
+              <h3>{analytics.totalInstitutions}</h3>
+              <p>Institutions</p>
+            </div>
+          </div>
 
-                <div className="summary-card card-green">
-                  <div className="card-icon">
-                    <Activity size={32} />
-                  </div>
-                  <div className="card-content">
-                    <p className="card-label">Active Assets</p>
-                    <p className="card-value">{analyticsData.activeAssets}</p>
-                  </div>
-                </div>
+          {/* Charts */}
+          <div className="charts-grid">
+            {/* Asset Status Pie Chart */}
+            <div className="chart-card">
+              <h3>Asset Status Distribution</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={pieChartData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) =>
+                      `${name}: ${(percent * 100).toFixed(0)}%`
+                    }
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {pieChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
 
-                <div className="summary-card card-orange">
-                  <div className="card-icon">
-                    <AlertCircle size={32} />
-                  </div>
-                  <div className="card-content">
-                    <p className="card-label">Retired Assets</p>
-                    <p className="card-value">{analyticsData.retiredAssets}</p>
-                  </div>
-                </div>
+            {/* Institution Comparison Bar Chart */}
+            <div className="chart-card">
+              <h3>Assets by Institution</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={barChartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="active" fill="#10b981" name="Active" />
+                  <Bar dataKey="retired" fill="#6b7280" name="Retired" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
 
-                <div className="summary-card card-purple">
-                  <div className="card-icon">
-                    <TrendingUp size={32} />
-                  </div>
-                  <div className="card-content">
-                    <p className="card-label">Retirement Rate</p>
-                    <p className="card-value">
-                      {((analyticsData.retiredAssets / analyticsData.totalAssets) * 100).toFixed(1)}%
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Charts Grid */}
-              <div className="charts-grid">
-                {/* Asset Growth Over Time */}
-                <div className="chart-card full-width">
-                  <h3 className="chart-title">
-                    <TrendingUp size={20} />
-                    Asset Growth Over Time
-                  </h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={analyticsData.assetGrowth}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="total" 
-                        stroke="#667eea" 
-                        strokeWidth={2}
-                        name="Total Assets"
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="active" 
-                        stroke="#10b981" 
-                        strokeWidth={2}
-                        name="Active"
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="retired" 
-                        stroke="#ef4444" 
-                        strokeWidth={2}
-                        name="Retired"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Institution Comparison */}
-                <div className="chart-card">
-                  <h3 className="chart-title">
-                    <Building2 size={20} />
-                    Assets by Institution
-                  </h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={analyticsData.institutionComparison}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      <Bar dataKey="total_assets" fill="#667eea" name="Total" />
-                      <Bar dataKey="active_assets" fill="#10b981" name="Active" />
-                      <Bar dataKey="retired_assets" fill="#ef4444" name="Retired" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Retirement Stats */}
-                <div className="chart-card">
-                  <h3 className="chart-title">
-                    <PieChartIcon size={20} />
-                    Asset Status Distribution
-                  </h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { name: 'Available', value: analyticsData.retirementStats.available || 0 },
-                          { name: 'On Loan', value: analyticsData.retirementStats.on_loan || 0 },
-                          { name: 'Maintenance', value: analyticsData.retirementStats.maintenance || 0 },
-                          { name: 'Retired', value: analyticsData.retirementStats.retired || 0 }
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        outerRadius={100}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {COLORS.map((color, index) => (
-                          <Cell key={`cell-${index}`} fill={color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Admin Activity Ranking */}
-              <div className="activity-ranking">
-                <h3 className="section-title">
-                  <Award size={20} />
-                  Top Admin Activity Ranking
-                </h3>
-                <div className="ranking-table">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Rank</th>
-                        <th>Admin</th>
-                        <th>Institution</th>
-                        <th>Total Actions</th>
-                        <th>Last Activity</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {analyticsData.adminActivity && analyticsData.adminActivity.map((admin, index) => (
-                        <tr key={admin.user_id}>
-                          <td className="rank-cell">
-                            <span className={`rank-badge rank-${index + 1}`}>
-                              #{index + 1}
-                            </span>
-                          </td>
-                          <td className="admin-cell">
-                            <div className="admin-info">
-                              <span className="admin-name">{admin.username}</span>
-                              <span className="admin-email">{admin.email}</span>
-                            </div>
-                          </td>
-                          <td>{admin.institution_name}</td>
-                          <td className="actions-cell">{admin.action_count}</td>
-                          <td>{new Date(admin.last_action).toLocaleDateString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
-          )}
+          {/* Admin Activity Table */}
+          <div className="activity-section">
+            <h3>Top Admin Activity</h3>
+            <table className="activity-table">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Email</th>
+                  <th>Institution</th>
+                  <th>Actions</th>
+                  <th>Last Activity</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.adminActivity.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: "center" }}>
+                      No activity data available
+                    </td>
+                  </tr>
+                ) : (
+                  analytics.adminActivity.map((admin, idx) => (
+                    <tr key={idx}>
+                      <td>{admin.username}</td>
+                      <td>{admin.email}</td>
+                      <td>{admin.institution_name}</td>
+                      <td>{admin.action_count}</td>
+                      <td>
+                        {admin.last_action
+                          ? new Date(admin.last_action).toLocaleDateString()
+                          : "N/A"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      {/* Audit Logs Section */}
-      {activeSection === "audit" && (
+      {/* Audit Logs Tab */}
+      {activeTab === "audit" && (
         <div className="audit-section">
-          <div className="section-header">
-            <h2>Audit & Activity Logs</h2>
-            <button onClick={exportAuditLogs} className="export-csv-btn">
-              <Download size={18} />
-              Export CSV
+          <div className="audit-actions">
+            <button onClick={() => fetchAuditLogs(auditPage)} className="refresh-btn">
+              🔄 Refresh
+            </button>
+            <button onClick={exportAuditLogs} className="export-btn">
+              📥 Export CSV
             </button>
           </div>
 
           {/* Filters */}
-          <div className="filters-panel">
-            <div className="filters-header">
-              <Filter size={20} />
-              <h3>Filters</h3>
-              <button onClick={clearFilters} className="clear-btn">Clear All</button>
-            </div>
+          <div className="audit-filters">
+            <select
+              name="institution_id"
+              value={auditFilters.institution_id}
+              onChange={handleFilterChange}
+            >
+              <option value="">All Institutions</option>
+              {institutions.map(inst => (
+                <option key={inst.id} value={inst.id}>
+                  {inst.name}
+                </option>
+              ))}
+            </select>
 
-            <div className="filters-grid">
-              <div className="filter-group">
-                <Building2 size={18} />
-                <select
-                  value={filters.institution_id}
-                  onChange={(e) => handleFilterChange("institution_id", e.target.value)}
-                  className="filter-select"
-                >
-                  <option value="">All Institutions</option>
-                  {institutions.map((inst) => (
-                    <option key={inst.id} value={inst.id}>{inst.name}</option>
-                  ))}
-                </select>
-              </div>
+            <select
+              name="user_id"
+              value={auditFilters.user_id}
+              onChange={handleFilterChange}
+            >
+              <option value="">All Users</option>
+              {users.map(user => (
+                <option key={user.id} value={user.id}>
+                  {user.username}
+                </option>
+              ))}
+            </select>
 
-              <div className="filter-group">
-                <User size={18} />
-                <select
-                  value={filters.user_id}
-                  onChange={(e) => handleFilterChange("user_id", e.target.value)}
-                  className="filter-select"
-                >
-                  <option value="">All Users</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.username} - {user.institution_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <select
+              name="action_type"
+              value={auditFilters.action_type}
+              onChange={handleFilterChange}
+            >
+              <option value="">All Actions</option>
+              <option value="CREATE">Create</option>
+              <option value="UPDATE">Update</option>
+              <option value="DELETE">Delete</option>
+              <option value="LOGIN">Login</option>
+              <option value="CHECK_OUT">Check Out</option>
+              <option value="CHECK_IN">Check In</option>
+              <option value="TRANSFER">Transfer</option>
+              <option value="RETIRE">Retire</option>
+              <option value="EXPORT_CSV">Export CSV</option>
+              <option value="CSV_IMPORT">CSV Import</option>
+            </select>
 
-              <div className="filter-group">
-                <Activity size={18} />
-                <select
-                  value={filters.action_type}
-                  onChange={(e) => handleFilterChange("action_type", e.target.value)}
-                  className="filter-select"
-                >
-                  <option value="">All Actions</option>
-                  {actionTypes.map((action) => (
-                    <option key={action} value={action}>{action}</option>
-                  ))}
-                </select>
-              </div>
+            <select
+              name="entity_type"
+              value={auditFilters.entity_type}
+              onChange={handleFilterChange}
+            >
+              <option value="">All Entity Types</option>
+              <option value="assets">Assets</option>
+              <option value="users">Users</option>
+              <option value="institutions">Institutions</option>
+              <option value="transactions">Transactions</option>
+              <option value="maintenance_records">Maintenance</option>
+              <option value="auth">Authentication</option>
+            </select>
 
-              <div className="filter-group">
-                <FileText size={18} />
-                <select
-                  value={filters.entity_type}
-                  onChange={(e) => handleFilterChange("entity_type", e.target.value)}
-                  className="filter-select"
-                >
-                  <option value="">All Entities</option>
-                  {entityTypes.map((entity) => (
-                    <option key={entity} value={entity}>{entity}</option>
-                  ))}
-                </select>
-              </div>
+            <input
+              type="text"
+              name="search"
+              placeholder="Search..."
+              value={auditFilters.search}
+              onChange={handleFilterChange}
+            />
 
-              <div className="filter-group">
-                <Calendar size={18} />
-                <input
-                  type="date"
-                  value={filters.date_from}
-                  onChange={(e) => handleFilterChange("date_from", e.target.value)}
-                  className="filter-input"
-                  placeholder="From Date"
-                />
-              </div>
+            <input
+              type="date"
+              name="date_from"
+              placeholder="From Date"
+              value={auditFilters.date_from}
+              onChange={handleFilterChange}
+            />
 
-              <div className="filter-group">
-                <Calendar size={18} />
-                <input
-                  type="date"
-                  value={filters.date_to}
-                  onChange={(e) => handleFilterChange("date_to", e.target.value)}
-                  className="filter-input"
-                  placeholder="To Date"
-                />
-              </div>
+            <input
+              type="date"
+              name="date_to"
+              placeholder="To Date"
+              value={auditFilters.date_to}
+              onChange={handleFilterChange}
+            />
 
-              <div className="filter-group search-group">
-                <Search size={18} />
-                <input
-                  type="text"
-                  value={filters.search}
-                  onChange={(e) => handleFilterChange("search", e.target.value)}
-                  className="filter-input"
-                  placeholder="Search logs..."
-                />
-              </div>
-            </div>
+            <button onClick={applyFilters} className="apply-btn">
+              Apply Filters
+            </button>
+            <button onClick={clearFilters} className="clear-btn">
+              Clear All
+            </button>
           </div>
 
-          {/* Logs Table */}
-          <div className="logs-panel">
-            <div className="logs-info">
-              <p>Showing {logs.length} of {pagination.total} logs (Immutable Records)</p>
-            </div>
-
-            {loading ? (
-              <div className="loading-container">
-                <div className="spinner"></div>
-                <p>Loading audit logs...</p>
-              </div>
-            ) : (
-              <>
-                <div className="table-wrapper">
-                  <table className="logs-table">
-                    <thead>
-                      <tr>
-                        <th>Timestamp</th>
-                        <th>User</th>
-                        <th>Institution</th>
-                        <th>Action</th>
-                        <th>Entity</th>
-                        <th>Entity ID</th>
-                        <th>Details</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {logs.length > 0 ? (
-                        logs.map((log) => (
-                          <tr key={log.id}>
-                            <td className="timestamp-col">
-                              {new Date(log.created_at).toLocaleString()}
-                            </td>
-                            <td>{log.username || "System"}</td>
-                            <td>{log.institution_name || "N/A"}</td>
-                            <td>
-                              <span className={`action-tag ${getActionColor(log.action)}`}>
-                                {log.action}
-                              </span>
-                            </td>
-                            <td>{log.entity_type}</td>
-                            <td>{log.entity_id || "-"}</td>
-                            <td className="details-col">
-                              {log.details && (
-                                <details>
-                                  <summary>View</summary>
-                                  <pre>{JSON.stringify(log.details, null, 2)}</pre>
-                                </details>
-                              )}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan="7" className="no-data">
-                            No logs found
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Pagination */}
-                {pagination.total > pagination.limit && (
-                  <div className="pagination-controls">
-                    <button
-                      onClick={() => setPagination(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
-                      disabled={pagination.page === 1}
-                      className="page-btn"
-                    >
-                      Previous
-                    </button>
-                    <span className="page-info">
-                      Page {pagination.page} of {Math.ceil(pagination.total / pagination.limit)}
-                    </span>
-                    <button
-                      onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                      disabled={pagination.page >= Math.ceil(pagination.total / pagination.limit)}
-                      className="page-btn"
-                    >
-                      Next
-                    </button>
-                  </div>
+          {/* Audit Logs Table */}
+          <div className="audit-logs-table">
+            <p>
+              Showing {auditLogs.length} of {auditTotal} activities across all institutions
+            </p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>User</th>
+                  <th>Institution</th>
+                  <th>Description</th>
+                  <th>Action Type</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: "center", padding: "3rem" }}>
+                      <div className="empty-state">
+                        No audit logs found
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  auditLogs.map(log => (
+                    <tr key={log.id}>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        {new Date(log.created_at).toLocaleString()}
+                      </td>
+                      <td>
+                        <div>
+                          <div style={{ fontWeight: 600, color: '#111827' }}>
+                            {log.user_full_name || log.username || "System"}
+                          </div>
+                          {log.user_role && (
+                            <div style={{ fontSize: '0.75rem', color: '#6b7280', textTransform: 'capitalize' }}>
+                              {log.user_role}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <span className="institution-badge">
+                          {log.institution_name || "System"}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="log-description">
+                          {log.description}
+                        </span>
+                      </td>
+                      <td>
+                        <span className="action-badge">{log.action}</span>
+                      </td>
+                      <td>
+                        {(log.details || log.old_values || log.new_values) ? (
+                          <details style={{ cursor: 'pointer' }}>
+                            <summary>View</summary>
+                            <pre>
+                              {JSON.stringify({
+                                details: log.details,
+                                old: log.old_values,
+                                new: log.new_values
+                              }, null, 2)}
+                            </pre>
+                          </details>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  ))
                 )}
-              </>
-            )}
+              </tbody>
+            </table>
+
+            {/* Pagination */}
+            <div className="pagination">
+              <button
+                onClick={() => fetchAuditLogs(auditPage - 1)}
+                disabled={auditPage === 1}
+              >
+                Previous
+              </button>
+              <span>
+                Page {auditPage} of {Math.ceil(auditTotal / 50)}
+              </span>
+              <button
+                onClick={() => fetchAuditLogs(auditPage + 1)}
+                disabled={auditPage >= Math.ceil(auditTotal / 50)}
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       )}

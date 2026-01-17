@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, EyeOff, Mail, Lock, LogIn, Building } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, LogIn } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { loginUser } from "../../api/loginUser";
 import "../../styles/login.css";
@@ -8,18 +8,12 @@ export default function Login() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ 
     email: "", 
-    password: "",
-    institution_id: "" 
+    password: ""
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [institutions, setInstitutions] = useState([
-    { id: "1", name: "Nairobi University" },
-    { id: "2", name: "Kampala Institute of Technology" },
-    { id: "3", name: "Dar es Salaam Polytechnic" }
-  ]);
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -33,7 +27,6 @@ export default function Login() {
     // Check if this looks like a super admin email
     if (email.includes('super@') || email === 'super@miams.system') {
       setIsSuperAdmin(true);
-      setForm(prev => ({ ...prev, institution_id: "" }));
     } else {
       setIsSuperAdmin(false);
     }
@@ -46,15 +39,13 @@ export default function Login() {
 
     try {
       console.log("Attempting login with:", {
-        email: form.email,
-        institutionId: isSuperAdmin ? null : parseInt(form.institution_id, 10)
+        email: form.email
       });
 
-      // Call login API
+      // Call login API - domain will be extracted from email on backend
       const response = await loginUser(
         form.email, 
-        form.password, 
-        isSuperAdmin ? null : parseInt(form.institution_id, 10)
+        form.password
       );
       
       console.log("Login response:", response);
@@ -62,8 +53,8 @@ export default function Login() {
       // Store data in localStorage
       localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(response.user));
-      if (!isSuperAdmin) {
-        localStorage.setItem("institutionId", parseInt(form.institution_id, 10));
+      if (response.user.institution_id) {
+        localStorage.setItem("institutionId", response.user.institution_id);
       }
       
       // Route based on user role
@@ -99,7 +90,7 @@ export default function Login() {
           <div className="logo-wrapper">
             <div className="logo-glow"></div>
             <div className="logo-container">
-              <img src="/miams_logo.svg" alt="MIAMS Logo" className="logo-image" />
+              <img src="frontend\public\miams_logo.svg" alt="MIAMS Logo" className="logo-image" />
             </div>
           </div>
           <div className="brand-text">
@@ -135,42 +126,25 @@ export default function Login() {
                     name="email"
                     value={form.email}
                     onChange={handleEmailChange}
-                    placeholder="you@example.com"
+                    placeholder="you@institution.ac.tz"
                     className="input-field"
                     required
                   />
                 </div>
+                <small style={{ 
+                  display: 'block', 
+                  marginTop: '0.5rem', 
+                  color: '#6b7280', 
+                  fontSize: '0.875rem' 
+                }}>
+                  Use your institutional email address
+                </small>
               </div>
-
-              {!isSuperAdmin && (
-                <div className="form-field">
-                  <label className="field-label">Institution</label>
-                  <div className="input-group">
-                    <Building className="input-icon" size={20} strokeWidth={2} />
-                    <select
-                      name="institution_id"
-                      value={form.institution_id}
-                      onChange={handleChange}
-                      className="input-field"
-                      required
-                    >
-                      <option value="" disabled>
-                        Select an institution
-                      </option>
-                      {institutions.map((inst) => (
-                        <option key={inst.id} value={inst.id}>
-                          {inst.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
 
               {isSuperAdmin && (
                 <div className="form-field">
                   <p style={{ color: '#10b981', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-                    ✓ Super Admin login detected - no institution required
+                    ✓ Super Admin login detected
                   </p>
                 </div>
               )}

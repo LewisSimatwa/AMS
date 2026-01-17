@@ -48,12 +48,14 @@ try {
         $stmt->execute(['institution_id' => $id]);
     }
 
+    // Fixed: Use separate parameter names for institution_id and entity_id
     $stmt = $db->prepare("
         INSERT INTO audit_logs (institution_id, user_id, entity_type, entity_id, action, old_values, new_values, details)
-        VALUES (:institution_id, :super_admin_id, 'institutions', :institution_id, :action, :old_values, :new_values, :details)
+        VALUES (:institution_id, :super_admin_id, 'institutions', :entity_id, :action, :old_values, :new_values, :details)
     ");
     $stmt->execute([
         'institution_id' => $id,
+        'entity_id' => $id,  // Added separate binding for entity_id
         'super_admin_id' => $decoded['user_id'],
         'action' => $is_active ? 'REACTIVATE' : 'DEACTIVATE',
         'old_values' => json_encode(['is_active' => $institution['is_active']]),

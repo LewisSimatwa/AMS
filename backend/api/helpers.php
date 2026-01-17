@@ -11,11 +11,9 @@ if (!function_exists('getAllHeadersCaseInsensitive')) {
     function getAllHeadersCaseInsensitive() {
         $headers = [];
         
-        // Try getallheaders first
         if (function_exists('getallheaders')) {
             $headers = getallheaders();
         } else {
-            // Fallback to $_SERVER
             foreach ($_SERVER as $key => $value) {
                 if (substr($key, 0, 5) === 'HTTP_') {
                     $header = str_replace(' ', '-', ucwords(str_replace('_', ' ', strtolower(substr($key, 5)))));
@@ -24,7 +22,6 @@ if (!function_exists('getAllHeadersCaseInsensitive')) {
             }
         }
         
-        // Convert to case-insensitive array
         return array_change_key_case($headers, CASE_LOWER);
     }
 }
@@ -33,12 +30,10 @@ if (!function_exists('getAuthorizationHeader')) {
     function getAuthorizationHeader() {
         $headers = getAllHeadersCaseInsensitive();
         
-        // Check in headers first
         if (isset($headers['authorization'])) {
             return $headers['authorization'];
         }
         
-        // Check $_SERVER variables
         if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
             return $_SERVER['HTTP_AUTHORIZATION'];
         }
@@ -47,7 +42,6 @@ if (!function_exists('getAuthorizationHeader')) {
             return $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
         }
         
-        // Check Apache-specific
         if (function_exists('apache_request_headers')) {
             $apacheHeaders = apache_request_headers();
             if (isset($apacheHeaders['Authorization'])) {
@@ -115,36 +109,27 @@ if (!function_exists('verifyToken')) {
 // -------------------
 if (!function_exists('verifyAuth')) {
     function verifyAuth() {
-        // Get authorization header using our helper function
         $authHeader = getAuthorizationHeader();
         
         error_log("=== Auth Verification ===");
         error_log("Auth header found: " . ($authHeader ? 'YES' : 'NO'));
-        if ($authHeader) {
-            error_log("Auth header (first 30 chars): " . substr($authHeader, 0, 30));
-        }
         
         if (!$authHeader) {
             error_log("No authorization header found");
             respond(['error' => 'No authorization header provided'], 401);
         }
 
-        // Extract token from Bearer format
         if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
             $token = $matches[1];
         } else {
-            // Maybe it's just the token without "Bearer"
             $token = $authHeader;
         }
-        
-        error_log("Token extracted (first 30 chars): " . substr($token, 0, 30));
         
         try {
             $decoded = verifyToken($token);
             
             error_log("Token verified successfully for user_id: " . $decoded['user_id']);
             
-            // Store in $_GET for easy access in other scripts
             $_GET['user_id'] = $decoded['user_id'];
             $_GET['role'] = $decoded['role'];
             $_GET['institution_id'] = $decoded['institution_id'];
@@ -192,7 +177,6 @@ if (!function_exists('getInput')) {
         $input = file_get_contents('php://input');
         $decoded = json_decode($input, true);
         
-        // Log for debugging
         error_log('Raw input: ' . substr($input, 0, 200));
         error_log('Decoded input: ' . json_encode($decoded));
         
@@ -201,25 +185,133 @@ if (!function_exists('getInput')) {
 }
 
 // -------------------
-// Audit Logs
+// Audit Logs - FIXED VERSION
 // -------------------
 if (!function_exists('logAudit')) {
-    function logAudit($db, $user_id, $entity_type, $entity_id, $action, $old, $new) {
+    /**
+     * Log audit activity with institution support
+     * 
+     * @param PDO $db - Database connection
+     * @param int $user_id - User performing the action
+     * @param string $entity_type - Type of entity (users, assets, etc.)
+     * @param int|null $entity_id - ID of the entity
+     * @param string $action - Action performed (CREATE, UPDATE, DELETE, LOGIN, etc.)
+     * @param mixed $old - Old values (array or null)
+     * @param mixed $new - New values (array or null)
+     * @param int|null $institution_id - Institution ID (will auto-fetch if null)
+     */
+    function logAudit($db, $user_id, $entity_type, $entity_id, $action, $old = null, $new = null, $institution_id = null) {
         try {
-            $sql = "INSERT INTO audit_logs (user_id, entity_type, entity_id, action, old_values, new_values, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, NOW())";
+            // If institution_id not provided, get it from user
+            if ($institution_id === null && $user_id !== null) {
+                $stmt = $db->prepare("SELECT institution_id FROM users WHERE id = ?");
+                $stmt->execute([$user_id]);
+                $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                $institution_id = $result ? $result['institution_id'] : null;
+            }
+            
+            $sql = "INSERT INTO audit_logs (
+                        user_id, 
+                        institution_id,
+                        entity_type, 
+                        entity_id, 
+                        action, 
+                        old_values, 
+                        new_values, 
+                        created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
+            
             $stmt = $db->prepare($sql);
             $stmt->execute([
                 $user_id,
+                $institution_id,
                 $entity_type,
                 $entity_id,
                 $action,
-                json_encode($old),
-                json_encode($new)
+                $old ? json_encode($old) : null,
+                $new ? json_encode($new) : null
             ]);
+            
+            return true;
         } catch (Exception $e) {
             error_log('Audit log error: ' . $e->getMessage());
+            return false;
         }
+    }
+}
+
+// -------------------
+// Simplified Audit Helpers
+// -------------------
+if (!function_exists('logLogin')) {
+    function logLogin($db, $user_id, $institution_id = null) {
+        return logAudit($db, $user_id, 'auth', null, 'LOGIN', null, null, $institution_id);
+    }
+}
+
+if (!function_exists('logLogout')) {
+    function logLogout($db, $user_id, $institution_id = null) {
+        return logAudit($db, $user_id, 'auth', null, 'LOGOUT', null, null, $institution_id);
+    }
+}
+
+if (!function_exists('logUserCreate')) {
+    function logUserCreate($db, $admin_id, $new_user_id, $username, $email, $institution_id = null) {
+        return logAudit(
+            $db, 
+            $admin_id, 
+            'users', 
+            $new_user_id, 
+            'CREATE', 
+            null, 
+            ['username' => $username, 'email' => $email],
+            $institution_id
+        );
+    }
+}
+
+if (!function_exists('logUserStatusChange')) {
+    function logUserStatusChange($db, $admin_id, $user_id, $username, $old_status, $new_status, $institution_id = null) {
+        return logAudit(
+            $db,
+            $admin_id,
+            'users',
+            $user_id,
+            'UPDATE',
+            ['username' => $username, 'is_active' => $old_status],
+            ['username' => $username, 'is_active' => $new_status],
+            $institution_id
+        );
+    }
+}
+
+if (!function_exists('logAssetCheckout')) {
+    function logAssetCheckout($db, $user_id, $asset_id, $asset_name, $holder_name, $institution_id = null) {
+        return logAudit(
+            $db,
+            $user_id,
+            'assets',
+            $asset_id,
+            'CHECK_OUT',
+            null,
+            ['asset_name' => $asset_name, 'holder_name' => $holder_name],
+            $institution_id
+        );
+    }
+}
+
+if (!function_exists('logAssetCheckin')) {
+    function logAssetCheckin($db, $user_id, $asset_id, $asset_name, $institution_id = null) {
+        return logAudit(
+            $db,
+            $user_id,
+            'assets',
+            $asset_id,
+            'CHECK_IN',
+            ['asset_name' => $asset_name],
+            null,
+            $institution_id
+        );
     }
 }
 

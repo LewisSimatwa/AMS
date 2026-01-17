@@ -26,8 +26,22 @@ function login() {
             respond(['error' => 'Missing email or password'], 400);
         }
 
-        // Check if this is a super admin login (no institution required)
-        $isSuperAdminAttempt = !isset($input['institution_id']) || $input['institution_id'] === null || $input['institution_id'] === '';
+        $email = trim($input['email']);
+        $password = $input['password'];
+
+        // Extract domain from email
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            error_log("auth.php login: Invalid email format");
+            respond(['error' => 'Invalid email address format'], 400);
+        }
+
+        $emailParts = explode('@', $email);
+        $domain = strtolower(trim($emailParts[1]));
+
+        error_log("auth.php login: Extracted domain: " . $domain);
+
+        // Check if this is a super admin login (no domain lookup needed)
+        $isSuperAdminAttempt = strpos($email, 'super@') !== false;
 
         if ($isSuperAdminAttempt) {
             // Super admin login - institution_id should be NULL
@@ -40,30 +54,50 @@ function login() {
                     LIMIT 1";
             
             $stmt = $db->prepare($sql);
-            $stmt->execute([$input['email']]);
+            $stmt->execute([$email]);
         } else {
-            // Regular user login - requires institution_id
+            // Regular user login - lookup institution by domain
+            // First, get institution_id from domain
+            $stmt = $db->prepare("SELECT id, is_active, name FROM institutions WHERE LOWER(domain) = LOWER(?)");
+            $stmt->execute([$domain]);
+            $institution = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$institution) {
+                error_log("auth.php login: No institution found for domain: " . $domain);
+                respond(['error' => 'No institution found for email domain: ' . $domain . '. Please contact your administrator.'], 404);
+            }
+
+            if (!$institution['is_active']) {
+                error_log("auth.php login: Institution is deactivated - " . $institution['name']);
+                respond(['error' => 'This institution has been deactivated. Please contact system administrator.'], 403);
+            }
+
+            $institution_id = $institution['id'];
+            error_log("auth.php login: Found institution_id: " . $institution_id . " for domain: " . $domain);
+
+            // Now lookup user with this email and institution
             $sql = "SELECT u.id, u.email, u.username, u.first_name, u.last_name, u.password_hash, 
-                           r.name AS role, u.institution_id
+                           r.name AS role, u.institution_id, i.name as institution_name
                     FROM users u
                     LEFT JOIN user_roles ur ON u.id = ur.user_id
                     LEFT JOIN roles r ON ur.role_id = r.id
+                    LEFT JOIN institutions i ON u.institution_id = i.id
                     WHERE u.email = ? AND u.institution_id = ?
                     LIMIT 1";
 
             $stmt = $db->prepare($sql);
-            $stmt->execute([$input['email'], (int)$input['institution_id']]);
+            $stmt->execute([$email, $institution_id]);
         }
 
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$user) {
-            error_log("auth.php login: User not found - " . $input['email'] . " with institution: " . ($isSuperAdminAttempt ? 'NULL' : $input['institution_id']));
+            error_log("auth.php login: User not found - " . $email . " with domain: " . $domain);
             respond(['error' => 'Invalid credentials'], 401);
         }
 
-        if (!checkPassword($input['password'], $user['password_hash'])) {
-            error_log("auth.php login: Invalid password for - " . $input['email']);
+        if (!checkPassword($password, $user['password_hash'])) {
+            error_log("auth.php login: Invalid password for - " . $email);
             respond(['error' => 'Invalid credentials'], 401);
         }
 
@@ -71,9 +105,6 @@ function login() {
         if (strtolower($user['role']) === 'super_admin' || strtolower($user['role']) === 'superadmin') {
             $user['role'] = 'super_admin';
         }
-
-        // Log login in audit table
-        logAudit($db, $user['id'], 'auth', $user['id'], 'LOGIN', null, null);
 
         // Generate JWT token with role information
         $token = generateToken($user);
@@ -84,8 +115,9 @@ function login() {
 
         // Remove sensitive data from response
         unset($user['password_hash']);
+        unset($user['institution_name']);
 
-        error_log("auth.php login: Login successful for - " . $input['email'] . " with role: " . $user['role']);
+        error_log("auth.php login: Login successful for - " . $email . " with role: " . $user['role']);
 
         respond([
             'token' => $token,
@@ -103,10 +135,7 @@ function logout() {
         $decoded = verifyAuth();
         
         $user_id = $decoded['user_id'];
-        
-        // Log logout
-        global $db;
-        logAudit($db, $user_id, 'auth', $user_id, 'LOGOUT', null, null);
+        $institution_id = $decoded['institution_id'] ?? null;
         
         respond(['message' => 'Logged out successfully']);
     } catch (Exception $e) {

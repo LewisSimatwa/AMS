@@ -1,13 +1,28 @@
 <?php
-// api/super-admin/audit-logs-export.php
+// api/super_admin/audit-logs-export.php
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+error_reporting(E_ALL);
+
+// Start output buffering
+ob_start();
+
 require __DIR__ . '/../cors.php';
 require __DIR__ . '/../config.php';
 require __DIR__ . '/../helpers.php';
 
 // Verify super admin authentication
-$decoded = verifyAuth();
-if (!isset($decoded['role']) || $decoded['role'] !== 'super_admin') {
-    respond(['error' => 'Access denied. Super admin privileges required.'], 403);
+try {
+    $decoded = verifyAuth();
+    if (!isset($decoded['role']) || $decoded['role'] !== 'super_admin') {
+        throw new Exception('Access denied. Super admin privileges required.');
+    }
+} catch (Exception $e) {
+    ob_end_clean();
+    header("Content-Type: application/json");
+    http_response_code(403);
+    echo json_encode(['error' => $e->getMessage()]);
+    exit;
 }
 
 try {
@@ -66,7 +81,7 @@ try {
                 al.id,
                 al.created_at as timestamp,
                 u.username,
-                i.name as institution,
+                COALESCE(i.name, 'System') as institution,
                 al.action,
                 al.entity_type,
                 al.entity_id,
@@ -83,14 +98,30 @@ try {
     $stmt->execute($params);
     $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Log the export
+    $stmtLog = $db->prepare("INSERT INTO audit_logs (user_id, action, entity_type, details, created_at) 
+                             VALUES (?, ?, ?, ?, NOW())");
+    $stmtLog->execute([
+        $decoded['user_id'],
+        'EXPORT_AUDIT_LOGS',
+        'audit_logs',
+        json_encode(['total_logs' => count($logs)])
+    ]);
+
+    // Clear output buffer before generating CSV
+    ob_end_clean();
+
     // Set CSV headers
-    header('Content-Type: text/csv');
-    header('Content-Disposition: attachment; filename="audit_logs_' . date('Y-m-d') . '.csv"');
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="audit_logs_' . date('Y-m-d_His') . '.csv"');
     header('Pragma: no-cache');
     header('Expires: 0');
 
     // Open output stream
     $output = fopen('php://output', 'w');
+
+    // Add BOM for Excel UTF-8 support
+    fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
 
     // Write CSV header
     fputcsv($output, [
@@ -131,7 +162,11 @@ try {
     exit;
 
 } catch (Exception $e) {
+    ob_end_clean();
     error_log('Export audit logs error: ' . $e->getMessage());
-    respond(['error' => 'Failed to export audit logs'], 500);
+    header("Content-Type: application/json");
+    http_response_code(500);
+    echo json_encode(['error' => 'Failed to export audit logs: ' . $e->getMessage()]);
+    exit;
 }
 ?>

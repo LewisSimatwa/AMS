@@ -1,16 +1,11 @@
-// api/loginUser.js - Debug version
+// api/loginUser.js
 
-export async function loginUser(email, password, institutionId) {
+export async function loginUser(email, password) {
   try {
     const body = {
       email: email,
-      password: password,
+      password: password
     };
-    
-    // Only add institution_id if it's provided (not null for super admin)
-    if (institutionId !== null && institutionId !== undefined) {
-      body.institution_id = institutionId;
-    }
 
     console.log("Login request body:", body);
 

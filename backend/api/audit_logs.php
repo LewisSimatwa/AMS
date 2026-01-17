@@ -94,8 +94,13 @@ try {
             i.name AS institution_name
         FROM audit_logs a
         LEFT JOIN users u ON a.user_id = u.id
+        LEFT JOIN user_roles ur ON u.id = ur.user_id
+        LEFT JOIN roles r ON ur.role_id = r.id
         LEFT JOIN institutions i ON a.institution_id = i.id
         WHERE a.institution_id = ?
+        AND (r.name IS NULL OR r.name != 'super_admin')
+        AND (u.username IS NULL OR u.username != 'System')
+        AND a.action != 'SCHEMA_UPDATE'
         ORDER BY a.created_at DESC
         LIMIT 500
     ");

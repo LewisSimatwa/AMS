@@ -21,17 +21,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 /* AUTH */
 try {
-    verifyAuth(); // This sets $_GET['user_id'], $_GET['institution_id'], etc.
+    $decoded = verifyAuth(); // This returns the decoded token
+    
+    // Check if user is admin (role_id = 2) or super_admin (role_id = 1)
+    if (!isset($decoded['role']) || !in_array($decoded['role'], ['admin', 'super_admin'])) {
+        throw new Exception('Access denied. Admin privileges required.');
+    }
+    
 } catch (Exception $e) {
     ob_end_clean();
     header("Content-Type: application/json");
-    http_response_code(401);
-    echo json_encode(['error' => 'Authentication failed: ' . $e->getMessage()]);
+    http_response_code(403);
+    echo json_encode(['error' => $e->getMessage()]);
     exit;
 }
 
-$institutionId = $_GET['institution_id'];
-$userId = $_GET['user_id'];
+$institutionId = $decoded['institution_id'];
+$userId = $decoded['user_id'];
 
 try {
     global $db;
@@ -84,6 +90,19 @@ try {
     $stmt = $db->prepare($sql);
     $stmt->execute([$institutionId]);
     $assets = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Log the export activity
+    $stmtLog = $db->prepare("
+        INSERT INTO audit_logs (user_id, institution_id, action, entity_type, details, created_at) 
+        VALUES (?, ?, ?, ?, ?, NOW())
+    ");
+    $stmtLog->execute([
+        $userId,
+        $institutionId,
+        'EXPORT_CSV',
+        'assets',
+        json_encode(['total_assets' => count($assets)])
+    ]);
 
     // Clear output buffer before generating CSV
     ob_end_clean();

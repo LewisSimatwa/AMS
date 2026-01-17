@@ -1,9 +1,20 @@
 import { useState, useEffect } from "react";
 import { 
-  Building2, Plus, Search, Edit2, Users, Package, X, Save, UserPlus, Shield, Key, UserX
+  Building2, Plus, Search, Edit2, Users, Package, X, Save, UserPlus, Shield, Key, UserX, Phone, Mail, Globe
 } from "lucide-react";
 
 const API_BASE = "http://localhost:8000/api/super_admin";
+
+const INSTITUTION_TYPES = [
+  'University',
+  'College',
+  'School',
+  'Research Center',
+  'Training Institute',
+  'Government Agency',
+  'NGO',
+  'Other'
+];
 
 export default function InstitutionManagement() {
   const [institutions, setInstitutions] = useState([]);
@@ -18,7 +29,15 @@ export default function InstitutionManagement() {
   const [modalMode, setModalMode] = useState("create");
   const [selected, setSelected] = useState(null);
   const [admins, setAdmins] = useState([]);
-  const [formData, setFormData] = useState({ name: "", code: "", address: "", contact_email: "" });
+  const [formData, setFormData] = useState({ 
+    name: "", 
+    code: "", 
+    domain: "",
+    phone_number: "",
+    institution_type: "",
+    address: "", 
+    contact_email: "" 
+  });
   const [adminForm, setAdminForm] = useState({ first_name: "", last_name: "", email: "", username: "", password: "" });
 
   const token = localStorage.getItem("token");
@@ -41,7 +60,27 @@ export default function InstitutionManagement() {
   const openModal = (type, mode = "create", item = null) => {
     setModalMode(mode);
     setSelected(item);
-    if (type === "institution" && item) setFormData({ name: item.name, code: item.code, address: item.address || "", contact_email: item.contact_email || "" });
+    if (type === "institution" && item) {
+      setFormData({ 
+        name: item.name, 
+        code: item.code || "", 
+        domain: item.domain || "",
+        phone_number: item.phone_number || "",
+        institution_type: item.institution_type || "",
+        address: item.address || "", 
+        contact_email: item.contact_email || "" 
+      });
+    } else if (type === "institution") {
+      setFormData({ 
+        name: "", 
+        code: "", 
+        domain: "",
+        phone_number: "",
+        institution_type: "",
+        address: "", 
+        contact_email: "" 
+      });
+    }
     if (type === "admin") setAdminForm({ first_name: "", last_name: "", email: "", username: "", password: "" });
     if (type === "manageAdmins") fetchAdmins(item.id);
     setModals({ ...modals, [type]: true });
@@ -49,8 +88,21 @@ export default function InstitutionManagement() {
 
   const closeModal = (type) => setModals({ ...modals, [type]: false });
 
+  // Auto-suggest domain from contact email
+  const handleContactEmailChange = (email) => {
+    setFormData({...formData, contact_email: email});
+    
+    // Only auto-fill if domain field is empty and email has @
+    if (email.includes('@') && !formData.domain) {
+      const domain = email.split('@')[1];
+      setFormData(prev => ({...prev, domain: domain}));
+    }
+  };
+
   const handleSubmitInstitution = async () => {
     if (!formData.name.trim()) return alert("Institution name is required");
+    if (!formData.domain.trim()) return alert("Domain is required");
+    
     const url = modalMode === "create" ? `${API_BASE}/institutions` : `${API_BASE}/institutions?id=${selected.id}`;
     const method = modalMode === "create" ? "POST" : "PUT";
     try {
@@ -164,7 +216,8 @@ export default function InstitutionManagement() {
 
   const filtered = institutions.filter(i => 
     i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    i.code?.toLowerCase().includes(searchTerm.toLowerCase())
+    i.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    i.domain?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
@@ -194,7 +247,7 @@ export default function InstitutionManagement() {
       </div>
 
       {/* Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: '1.5rem' }}>
         {filtered.map((inst) => (
           <div key={inst.id} style={{
             background: inst.is_active ? 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)' : 'linear-gradient(135deg, #f7fafc 0%, #e2e8f0 100%)',
@@ -208,8 +261,8 @@ export default function InstitutionManagement() {
               }}>
                 <Building2 size={24} />
               </div>
-              <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                   {inst.name}
                   {!inst.is_active && <span style={{
                     padding: '0.25rem 0.5rem', background: '#fed7d7', color: '#c53030',
@@ -217,14 +270,47 @@ export default function InstitutionManagement() {
                   }}>INACTIVE</span>}
                 </h3>
                 <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>{inst.code}</p>
+                {inst.institution_type && (
+                  <span style={{ 
+                    display: 'inline-block',
+                    marginTop: '0.25rem',
+                    padding: '0.125rem 0.5rem', 
+                    background: '#e0e7ff', 
+                    color: '#4338ca',
+                    borderRadius: '0.25rem', 
+                    fontSize: '0.75rem', 
+                    fontWeight: '500'
+                  }}>
+                    {inst.institution_type}
+                  </span>
+                )}
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', padding: '0.75rem', background: '#f9fafb', borderRadius: '0.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#4b5563' }}>
+            {/* Contact Info */}
+            <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#f9fafb', borderRadius: '0.5rem', fontSize: '0.875rem' }}>
+              {inst.domain && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#4b5563', marginBottom: '0.375rem' }}>
+                  <Globe size={14} /> <span style={{ fontFamily: 'monospace', fontSize: '0.8125rem' }}>@{inst.domain}</span>
+                </div>
+              )}
+              {inst.contact_email && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#4b5563', marginBottom: '0.375rem' }}>
+                  <Mail size={14} /> <span style={{ fontSize: '0.8125rem' }}>{inst.contact_email}</span>
+                </div>
+              )}
+              {inst.phone_number && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#4b5563' }}>
+                  <Phone size={14} /> <span>{inst.phone_number}</span>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', padding: '0.75rem', background: '#fef3c7', borderRadius: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#78350f', fontWeight: '500' }}>
                 <Users size={16} /> {inst.user_count || 0} Users
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#4b5563' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#78350f', fontWeight: '500' }}>
                 <Package size={16} /> {inst.asset_count || 0} Assets
               </div>
             </div>
@@ -264,9 +350,42 @@ export default function InstitutionManagement() {
       {modals.institution && (
         <Modal onClose={() => closeModal("institution")} title={`${modalMode === "create" ? "Create" : "Edit"} Institution`}>
           <Input label="Institution Name *" value={formData.name} onChange={(v) => setFormData({...formData, name: v})} />
-          <Input label="Code" value={formData.code} onChange={(v) => setFormData({...formData, code: v})} />
-          <Input label="Address" value={formData.address} onChange={(v) => setFormData({...formData, address: v})} />
-          <Input label="Contact Email" type="email" value={formData.contact_email} onChange={(v) => setFormData({...formData, contact_email: v})} />
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <Input label="Code" value={formData.code} onChange={(v) => setFormData({...formData, code: v})} />
+            <Select 
+              label="Institution Type" 
+              value={formData.institution_type} 
+              onChange={(v) => setFormData({...formData, institution_type: v})}
+              options={INSTITUTION_TYPES}
+            />
+          </div>
+
+          <Input 
+            label="Contact Email" 
+            type="email" 
+            value={formData.contact_email} 
+            onChange={handleContactEmailChange}
+          />
+          
+          <Input 
+            label="Domain (for user logins) *" 
+            value={formData.domain} 
+            onChange={(v) => setFormData({...formData, domain: v})}
+            placeholder="e.g., dsp.ac.tz, nuni.ac.ke"
+            helperText="Users with email addresses @[this domain] will be assigned to this institution"
+          />
+
+          <Input 
+            label="Phone Number" 
+            type="tel" 
+            value={formData.phone_number} 
+            onChange={(v) => setFormData({...formData, phone_number: v})}
+            placeholder="+255 XXX XXX XXX"
+          />
+
+          <Input label="Address" value={formData.address} onChange={(v) => setFormData({...formData, address: v})} textarea />
+          
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
             <CancelBtn onClick={() => closeModal("institution")} />
             <Btn onClick={handleSubmitInstitution} bg="#667eea"><Save size={18} /> Save</Btn>
@@ -382,11 +501,46 @@ const Modal = ({ onClose, title, children, large }) => (
   </div>
 );
 
-const Input = ({ label, value, onChange, type = "text" }) => (
+const Input = ({ label, value, onChange, type = "text", placeholder, helperText, textarea }) => (
   <div style={{ marginBottom: '1rem' }}>
-    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>{label}</label>
-    <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
-      style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '0.5rem' }} />
+    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', fontSize: '0.875rem' }}>{label}</label>
+    {textarea ? (
+      <textarea 
+        value={value} 
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '0.5rem', minHeight: '80px', fontFamily: 'inherit' }} 
+      />
+    ) : (
+      <input 
+        type={type} 
+        value={value} 
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '0.5rem' }} 
+      />
+    )}
+    {helperText && (
+      <small style={{ display: 'block', marginTop: '0.25rem', color: '#6b7280', fontSize: '0.75rem' }}>
+        {helperText}
+      </small>
+    )}
+  </div>
+);
+
+const Select = ({ label, value, onChange, options }) => (
+  <div style={{ marginBottom: '1rem' }}>
+    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', fontSize: '0.875rem' }}>{label}</label>
+    <select 
+      value={value} 
+      onChange={(e) => onChange(e.target.value)}
+      style={{ width: '100%', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '0.5rem', background: 'white' }}
+    >
+      <option value="">Select...</option>
+      {options.map(opt => (
+        <option key={opt} value={opt}>{opt}</option>
+      ))}
+    </select>
   </div>
 );
 
