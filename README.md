@@ -1,16 +1,37 @@
-# React + Vite
+MIAMS – Multi-Institution Asset Management System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+MIAMS is a secure, multi-tenant asset management system designed to manage assets across multiple institutions from a single platform. I built it to solve real problems around asset loss, accountability, audits, and predictive maintenance—without relying on cloud tracking or geolocation.
+The system enforces strict tenant isolation, role-based access control, and immutable audit trails, while layering in predictive analytics for smarter decision-making.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Core Features
+• Multi-institution (tenant-aware) architecture
+• Role-based access (Super-Admin, Admin, Security, ICT, Auditor, Manager, Staff)
+• Full asset lifecycle management
+• Secure check-in / check-out workflows
+• Predictive analytics for asset risk and maintenance
+• Immutable audit logs (system-wide)
+• High-signal dashboards and reports
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+System Architecture
+• Frontend: React
+• Backend: PHP (REST APIs)
+• Predictive Analytics: Python
+• Database: PostgreSQL
+• Auth: JWT + Institution context headers
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Major Modules
+
+1. Authentication & Tenant Access
+2. Institution & User Management
+3. Asset Management (core module)
+4. Check-In / Check-Out & Movement
+5. Maintenance & Predictive Maintenance
+6. Predictive Analytics
+7. Reporting & Dashboards
+8. Global Audit Trail (system-wide)
