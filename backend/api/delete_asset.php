@@ -10,7 +10,14 @@ require __DIR__ . '/helpers.php';
 
 ob_end_clean();
 
-header("Access-Control-Allow-Origin: http://localhost:5173");
+$allowedOrigins = ['http://localhost:5173', 'http://localhost:5174'];
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+
+if (in_array($origin, $allowedOrigins)) {
+    header("Access-Control-Allow-Origin: $origin");
+} else {
+    header("Access-Control-Allow-Origin: *"); // Fallback for development
+}
 header("Access-Control-Allow-Headers: Authorization, Content-Type, X-Institution-ID");
 header("Access-Control-Allow-Methods: POST, DELETE, OPTIONS");
 header("Content-Type: application/json");

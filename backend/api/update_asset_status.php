@@ -14,7 +14,7 @@ require __DIR__ . '/helpers.php';
 ob_end_clean();
 
 /* HEADERS */
-header("Access-Control-Allow-Origin: http://localhost:5173");
+header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Headers: Authorization, Content-Type, X-Institution-ID");
 header("Access-Control-Allow-Methods: PUT, OPTIONS");
 header("Content-Type: application/json");
