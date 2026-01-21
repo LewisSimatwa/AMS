@@ -16,7 +16,7 @@ $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if (in_array($origin, $allowedOrigins)) {
     header("Access-Control-Allow-Origin: $origin");
 } else {
-    header("Access-Control-Allow-Origin: *"); // Fallback for development
+    header("Access-Control-Allow-Origin: *");
 }
 header("Access-Control-Allow-Headers: Authorization, Content-Type, X-Institution-ID");
 header("Access-Control-Allow-Methods: POST, DELETE, OPTIONS");

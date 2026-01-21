@@ -37,18 +37,17 @@ try {
     $where = [];
     $params = [];
 
-    // IMPORTANT: Filter out LOGIN/LOGOUT actions to show only meaningful activities
-    $where[] = "al.action NOT IN ('LOGIN', 'LOGOUT')";
+    // CRITICAL CHANGE: Only exclude LOGIN actions, show ALL other activities
+    // This will include CREATE, UPDATE, DELETE, CHECK_OUT, CHECK_IN, TRANSFER, RETIRE, etc.
+    $where[] = "al.action != 'LOGIN'";
 
-    // For super admin: if institution_id is provided, filter by it
-    // Otherwise, show ALL institutions' logs (exclude NULL institution_id which are super admin's own logs)
+    // Institution filter
     if ($institution_id) {
         $where[] = "al.institution_id = :institution_id";
         $params[':institution_id'] = $institution_id;
-    } else {
-        // Show only logs that belong to institutions (exclude super admin's own logs with NULL institution_id)
-        $where[] = "al.institution_id IS NOT NULL";
     }
+    // NOTE: Removed the "al.institution_id IS NOT NULL" filter
+    // This allows super admin to see their own system-level actions too if needed
 
     if ($user_id) {
         $where[] = "al.user_id = :user_id";
@@ -111,11 +110,12 @@ try {
                 u.last_name,
                 TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) as user_full_name,
                 i.name as institution_name,
+                i.code as institution_code,
                 r.name as user_role
             FROM audit_logs al
             LEFT JOIN users u ON al.user_id = u.id
             LEFT JOIN institutions i ON al.institution_id = i.id
-            LEFT JOIN user_roles ur ON u.id = ur.user_id
+            LEFT JOIN user_roles ur ON u.id = ur.user_id AND (ur.institution_id = al.institution_id OR ur.institution_id IS NULL)
             LEFT JOIN roles r ON ur.role_id = r.id
             $whereClause
             ORDER BY al.created_at DESC
@@ -145,25 +145,26 @@ try {
         }
 
         // Fix display values
-        // If user_full_name is empty, use username
         if (empty(trim($log['user_full_name'])) && !empty($log['username'])) {
             $log['user_full_name'] = $log['username'];
         }
         
-        // If still empty, use email or "Unknown User"
         if (empty(trim($log['user_full_name'])) && !empty($log['user_email'])) {
             $log['user_full_name'] = $log['user_email'];
         }
         
         if (empty(trim($log['user_full_name']))) {
-            $log['user_full_name'] = 'Unknown User';
+            $log['user_full_name'] = 'System';
         }
 
-        // Fix institution display
-        // Leave institution_name as NULL/empty for super admins
-        // Only show institution name for regular institution users
+        // Institution name handling
         if (empty($log['institution_name'])) {
-            $log['institution_name'] = null; // Keep it null/blank for super admins
+            // Check if this is a super admin action (no institution)
+            if ($log['user_role'] === 'super_admin') {
+                $log['institution_name'] = 'System-wide';
+            } else {
+                $log['institution_name'] = 'Unknown';
+            }
         }
 
         // Generate human-readable description
@@ -187,18 +188,12 @@ try {
 function generateLogDescription($log) {
     $action = $log['action'];
     $entityType = $log['entity_type'];
-    
-    // Use the properly formatted user_full_name
-    $username = $log['user_full_name'];
-    
-    // If somehow still empty, fallback
-    if (empty(trim($username))) {
-        $username = $log['username'] ?: $log['user_email'] ?: 'Unknown User';
-    }
+    $username = $log['user_full_name'] ?: 'System';
+    $institution = $log['institution_name'] ?: '';
     
     switch ($action) {
         case 'LOGIN':
-            return "$username logged in";
+            return "$username logged in" . ($institution ? " to $institution" : "");
             
         case 'LOGOUT':
             return "$username logged out";
@@ -206,13 +201,19 @@ function generateLogDescription($log) {
         case 'CREATE':
             if ($entityType === 'users') {
                 $newUser = $log['new_values']['username'] ?? 'user';
-                return "$username created user account: $newUser";
+                $email = $log['new_values']['email'] ?? '';
+                return "$username created user account: $newUser" . ($email ? " ($email)" : "");
             } elseif ($entityType === 'assets') {
                 $assetName = $log['new_values']['name'] ?? $log['new_values']['asset_code'] ?? 'asset';
-                return "$username registered new asset: $assetName";
+                $assetCode = $log['new_values']['asset_code'] ?? '';
+                return "$username registered new asset: $assetName" . ($assetCode && $assetCode !== $assetName ? " ($assetCode)" : "");
             } elseif ($entityType === 'institutions') {
                 $instName = $log['new_values']['name'] ?? 'institution';
                 return "$username created institution: $instName";
+            } elseif ($entityType === 'maintenance_records') {
+                $assetName = $log['details']['asset_name'] ?? 'asset';
+                $maintenanceType = $log['details']['maintenance_type'] ?? 'maintenance';
+                return "$username created $maintenanceType record for $assetName";
             }
             return "$username created $entityType";
             
@@ -229,10 +230,21 @@ function generateLogDescription($log) {
                 return "$username updated user: $targetUser";
             } elseif ($entityType === 'assets') {
                 $assetCode = $log['new_values']['asset_code'] ?? $log['old_values']['asset_code'] ?? 'asset';
-                return "$username updated asset: $assetCode";
+                $assetName = $log['new_values']['name'] ?? $log['old_values']['name'] ?? '';
+                return "$username updated asset: " . ($assetName ?: $assetCode);
             } elseif ($entityType === 'institutions') {
                 $instName = $log['new_values']['name'] ?? $log['old_values']['name'] ?? 'institution';
+                if (isset($log['new_values']['is_active']) && isset($log['old_values']['is_active'])) {
+                    if ($log['new_values']['is_active'] && !$log['old_values']['is_active']) {
+                        return "$username reactivated institution: $instName";
+                    } elseif (!$log['new_values']['is_active'] && $log['old_values']['is_active']) {
+                        return "$username deactivated institution: $instName";
+                    }
+                }
                 return "$username updated institution: $instName";
+            } elseif ($entityType === 'system_config') {
+                $section = $log['details']['section'] ?? 'settings';
+                return "$username updated system configuration: $section";
             }
             return "$username updated $entityType";
             
@@ -242,33 +254,53 @@ function generateLogDescription($log) {
                 return "$username deleted user account: $deletedUser";
             } elseif ($entityType === 'assets') {
                 $assetCode = $log['old_values']['asset_code'] ?? 'asset';
-                return "$username deleted asset: $assetCode";
+                $assetName = $log['old_values']['name'] ?? '';
+                return "$username deleted asset: " . ($assetName ?: $assetCode);
+            } elseif ($entityType === 'institutions') {
+                $instName = $log['old_values']['name'] ?? 'institution';
+                return "$username deleted institution: $instName";
             }
             return "$username deleted $entityType";
             
         case 'CHECK_OUT':
-            $assetName = $log['new_values']['asset_name'] ?? 'asset';
+            $assetName = $log['new_values']['asset_name'] ?? $log['details']['asset_name'] ?? 'asset';
             $holder = $log['new_values']['holder_name'] ?? 'user';
-            return "$username checked out $assetName to $holder";
+            $location = $log['new_values']['location'] ?? $log['details']['location'] ?? '';
+            return "$username checked out $assetName to $holder" . ($location ? " at $location" : "");
             
         case 'CHECK_IN':
-            $assetName = $log['old_values']['asset_name'] ?? 'asset';
-            return "$username checked in $assetName";
+            $assetName = $log['old_values']['asset_name'] ?? $log['details']['asset_name'] ?? 'asset';
+            $condition = $log['new_values']['condition'] ?? '';
+            return "$username checked in $assetName" . ($condition ? " (condition: $condition)" : "");
             
         case 'TRANSFER':
             $assetName = $log['details']['asset_name'] ?? 'asset';
-            $fromDept = $log['old_values']['department_name'] ?? 'unknown';
-            $toDept = $log['new_values']['department_name'] ?? 'unknown';
-            return "$username transferred $assetName from $fromDept to $toDept";
+            $fromDept = $log['old_values']['department_name'] ?? '';
+            $toDept = $log['new_values']['department_name'] ?? '';
+            $fromLoc = $log['old_values']['location'] ?? '';
+            $toLoc = $log['new_values']['location'] ?? '';
+            
+            $desc = "$username transferred $assetName";
+            if ($fromDept && $toDept) {
+                $desc .= " from $fromDept to $toDept";
+            } elseif ($fromLoc && $toLoc) {
+                $desc .= " from $fromLoc to $toLoc";
+            }
+            return $desc;
             
         case 'RETIRE':
-            $assetCode = $log['details']['asset_code'] ?? 'asset';
-            return "$username retired asset: $assetCode";
+            $assetCode = $log['details']['asset_code'] ?? $log['old_values']['asset_code'] ?? 'asset';
+            $assetName = $log['details']['asset_name'] ?? $log['old_values']['name'] ?? '';
+            $reason = $log['details']['retirement_reason'] ?? $log['new_values']['retirement_reason'] ?? '';
+            return "$username retired asset: " . ($assetName ?: $assetCode) . ($reason ? " (reason: $reason)" : "");
             
         case 'REACTIVATE':
             if ($entityType === 'institutions') {
                 $instName = $log['new_values']['name'] ?? $log['old_values']['name'] ?? 'institution';
                 return "$username reactivated institution: $instName";
+            } elseif ($entityType === 'assets') {
+                $assetCode = $log['new_values']['asset_code'] ?? 'asset';
+                return "$username reactivated asset: $assetCode";
             }
             return "$username reactivated $entityType";
             
@@ -280,15 +312,27 @@ function generateLogDescription($log) {
             return "$username deactivated $entityType";
             
         case 'CSV_IMPORT':
-            $count = $log['details']['imported'] ?? $log['details']['total_count'] ?? 0;
-            return "$username imported $count items via CSV";
+            $imported = $log['details']['imported'] ?? 0;
+            $failed = $log['details']['failed'] ?? 0;
+            $total = $log['details']['total_rows'] ?? ($imported + $failed);
+            $instName = $log['details']['institution_name'] ?? $institution;
+            return "$username imported $imported assets via CSV" . ($failed > 0 ? " ($failed failed)" : "") . ($instName ? " for $instName" : "");
             
         case 'EXPORT_CSV':
         case 'EXPORT_AUDIT_LOGS':
         case 'EXPORT_ANALYTICS':
             $count = $log['details']['total_assets'] ?? $log['details']['total_records'] ?? 0;
-            $exportType = str_replace('EXPORT_', '', $action);
+            $exportType = str_replace('EXPORT_', '', strtolower($action));
+            $exportType = str_replace('_', ' ', $exportType);
             return "$username exported $exportType" . ($count > 0 ? " ($count records)" : "");
+            
+        case 'CREATE_INSTITUTION':
+            $instName = $log['details'] ? json_decode($log['details'], true)['name'] ?? 'institution' : 'institution';
+            return "$username created new institution: $instName";
+            
+        case 'SCHEMA_UPDATE':
+            $change = $log['details']['change'] ?? 'schema update';
+            return "System performed: $change";
             
         default:
             return "$username performed $action on $entityType";
