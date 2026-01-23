@@ -78,8 +78,63 @@ export default function SuperAdminDashboard() {
 
   if (loading) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
+      <div className="dashboard-container">
+        <div className="dashboard-header">
+          <div className="skeleton skeleton-title"></div>
+          <div className="skeleton skeleton-subtitle"></div>
+        </div>
+
+        <div className="stats-grid">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="stat-card skeleton-card">
+              <div className="stat-card-content">
+                <div className="stat-card-info">
+                  <div className="skeleton skeleton-label"></div>
+                  <div className="skeleton skeleton-value"></div>
+                  <div className="skeleton skeleton-subtext"></div>
+                </div>
+                <div className="skeleton skeleton-icon"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="content-grid">
+          <div className="dashboard-card">
+            <div className="card-header">
+              <div className="skeleton skeleton-card-title"></div>
+            </div>
+            <div className="skeleton-list">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="skeleton-list-item">
+                  <div className="skeleton skeleton-circle"></div>
+                  <div style={{ flex: 1 }}>
+                    <div className="skeleton skeleton-text"></div>
+                    <div className="skeleton skeleton-text-small"></div>
+                  </div>
+                  <div className="skeleton skeleton-badge"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="dashboard-card">
+            <div className="card-header">
+              <div className="skeleton skeleton-card-title"></div>
+            </div>
+            <div className="skeleton-list">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="skeleton-list-item">
+                  <div style={{ flex: 1 }}>
+                    <div className="skeleton skeleton-text"></div>
+                    <div className="skeleton skeleton-text-small"></div>
+                  </div>
+                  <div className="skeleton skeleton-badge"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

@@ -196,8 +196,12 @@ export default function Login() {
               >
                 {loading ? (
                   <>
-                    <div className="loading-spinner"></div>
-                    <span>Signing in...</span>
+                    <span>Signing in</span>
+                    <span className="loading-dots">
+                      <span>.</span>
+                      <span>.</span>
+                      <span>.</span>
+                    </span>
                   </>
                 ) : (
                   <>

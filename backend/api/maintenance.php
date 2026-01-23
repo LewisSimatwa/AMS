@@ -58,6 +58,10 @@ try {
             scheduleMaintenance($db, $institution_id, $user_id);
             break;
         
+        case 'close':
+            closeMaintenance($db, $institution_id, $user_id);
+            break;
+        
         default:
             http_response_code(400);
             echo json_encode(["success" => false, "error" => "Invalid action"]);
@@ -75,19 +79,25 @@ function listMaintenanceRecords($db, $institution_id) {
             mr.maintenance_type,
             mr.description,
             mr.status,
-            mr.cost,
+            mr.estimated_cost,
+            mr.actual_cost,
             mr.start_date,
             mr.end_date,
+            mr.actual_completion_date,
+            mr.completion_notes,
             mr.created_at,
+            mr.closed_at,
             a.name AS asset_name,
             a.asset_code,
             a.id AS asset_id,
             u1.first_name || ' ' || u1.last_name AS reported_by_name,
-            u2.first_name || ' ' || u2.last_name AS assigned_to_name
+            u2.first_name || ' ' || u2.last_name AS assigned_to_name,
+            u3.first_name || ' ' || u3.last_name AS closed_by_name
         FROM maintenance_records mr
         LEFT JOIN assets a ON mr.asset_id = a.id
         LEFT JOIN users u1 ON mr.reported_by = u1.id
         LEFT JOIN users u2 ON mr.assigned_to = u2.id
+        LEFT JOIN users u3 ON mr.closed_by = u3.id
         WHERE mr.institution_id = ?
         ORDER BY mr.created_at DESC
     ");
@@ -99,7 +109,9 @@ function listMaintenanceRecords($db, $institution_id) {
     foreach ($records as &$record) {
         $record['start_date'] = $record['start_date'] ? date('Y-m-d', strtotime($record['start_date'])) : null;
         $record['end_date'] = $record['end_date'] ? date('Y-m-d', strtotime($record['end_date'])) : null;
+        $record['actual_completion_date'] = $record['actual_completion_date'] ? date('Y-m-d H:i', strtotime($record['actual_completion_date'])) : null;
         $record['created_at'] = date('Y-m-d H:i', strtotime($record['created_at']));
+        $record['closed_at'] = $record['closed_at'] ? date('Y-m-d H:i', strtotime($record['closed_at'])) : null;
     }
     
     echo json_encode([
@@ -212,7 +224,7 @@ function scheduleMaintenance($db, $institution_id, $user_id) {
     $description = $input['description'] ?? null;
     $start_date = $input['start_date'] ?? null;
     $assigned_to = $input['assigned_to'] ?? null;
-    $cost = $input['cost'] ?? 0;
+    $estimated_cost = $input['estimated_cost'] ?? 0;
     
     if (!$asset_id || !$description || !$start_date) {
         throw new Exception("Asset, description, and start date are required");
@@ -225,8 +237,8 @@ function scheduleMaintenance($db, $institution_id, $user_id) {
     }
     
     // Validate and sanitize cost
-    $cost = floatval($cost);
-    if ($cost < 0) {
+    $estimated_cost = floatval($estimated_cost);
+    if ($estimated_cost < 0) {
         throw new Exception("Cost cannot be negative");
     }
     
@@ -269,7 +281,7 @@ function scheduleMaintenance($db, $institution_id, $user_id) {
                 maintenance_type,
                 description,
                 status,
-                cost,
+                estimated_cost,
                 start_date,
                 created_at,
                 updated_at
@@ -284,7 +296,7 @@ function scheduleMaintenance($db, $institution_id, $user_id) {
             $assigned_to ?: null,
             $maintenance_type,
             $description,
-            $cost,
+            $estimated_cost,
             $start_date
         ]);
         
@@ -321,7 +333,7 @@ function scheduleMaintenance($db, $institution_id, $user_id) {
                 'asset_name' => $asset['name'],
                 'maintenance_type' => $maintenance_type,
                 'status' => 'open',
-                'cost' => $cost
+                'estimated_cost' => $estimated_cost
             ]),
             json_encode([
                 'description' => $description,
@@ -335,7 +347,154 @@ function scheduleMaintenance($db, $institution_id, $user_id) {
             "success" => true,
             "message" => "Maintenance scheduled successfully",
             "maintenance_id" => $maintenance_id,
-            "cost" => $cost
+            "estimated_cost" => $estimated_cost
+        ]);
+        
+    } catch (Exception $e) {
+        $db->rollBack();
+        throw $e;
+    }
+}
+
+// Close maintenance
+function closeMaintenance($db, $institution_id, $user_id) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        throw new Exception("Method not allowed");
+    }
+
+    // VERIFY USER HAS ICT ROLE
+    $stmt = $db->prepare("
+        SELECT r.name 
+        FROM user_roles ur
+        JOIN roles r ON ur.role_id = r.id
+        WHERE ur.user_id = ? 
+        AND ur.institution_id = ?
+        AND r.name IN ('ict', 'admin')
+    ");
+    $stmt->execute([$user_id, $institution_id]);
+    $hasIctRole = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$hasIctRole) {
+        http_response_code(403);
+        echo json_encode([
+            "success" => false, 
+            "error" => "Access denied. Only ICT staff can close maintenance records."
+        ]);
+        return;
+    }
+    
+    $input = json_decode(file_get_contents('php://input'), true);
+    
+    if (!$input) {
+        throw new Exception("Invalid JSON input");
+    }
+    
+    // Validate required fields
+    $maintenance_id = $input['maintenance_id'] ?? null;
+    $actual_cost = $input['actual_cost'] ?? 0;
+    $completion_notes = $input['completion_notes'] ?? '';
+    
+    if (!$maintenance_id) {
+        throw new Exception("Maintenance ID is required");
+    }
+    
+    // Validate and sanitize cost
+    $actual_cost = floatval($actual_cost);
+    if ($actual_cost < 0) {
+        throw new Exception("Actual cost cannot be negative");
+    }
+    
+    $db->beginTransaction();
+    
+    try {
+        // Get maintenance record and verify it exists
+        $stmt = $db->prepare("
+            SELECT mr.id, mr.asset_id, mr.status, a.name as asset_name, a.asset_code
+            FROM maintenance_records mr
+            JOIN assets a ON mr.asset_id = a.id
+            WHERE mr.id = ? AND mr.institution_id = ?
+        ");
+        $stmt->execute([$maintenance_id, $institution_id]);
+        $record = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$record) {
+            throw new Exception("Maintenance record not found");
+        }
+        
+        if ($record['status'] === 'closed') {
+            throw new Exception("Maintenance record is already closed");
+        }
+        
+        // Update maintenance record
+        $stmt = $db->prepare("
+            UPDATE maintenance_records 
+            SET 
+                status = 'closed',
+                actual_cost = ?,
+                actual_completion_date = now(),
+                completion_notes = ?,
+                closed_by = ?,
+                closed_at = now(),
+                updated_at = now()
+            WHERE id = ?
+        ");
+        
+        $stmt->execute([
+            $actual_cost,
+            $completion_notes,
+            $user_id,
+            $maintenance_id
+        ]);
+        
+        // Update asset status back to available
+        $stmt = $db->prepare("
+            UPDATE assets 
+            SET status = 'available', updated_at = now()
+            WHERE id = ?
+        ");
+        $stmt->execute([$record['asset_id']]);
+        
+        // Create audit log
+        $stmt = $db->prepare("
+            INSERT INTO audit_logs (
+                institution_id,
+                user_id,
+                entity_type,
+                entity_id,
+                action,
+                old_values,
+                new_values,
+                details,
+                created_at
+            ) VALUES (?, ?, 'maintenance_records', ?, 'CLOSE', ?, ?, ?, now())
+        ");
+        
+        $stmt->execute([
+            $institution_id,
+            $user_id,
+            $maintenance_id,
+            json_encode([
+                'status' => $record['status']
+            ]),
+            json_encode([
+                'status' => 'closed',
+                'actual_cost' => $actual_cost,
+                'closed_by' => $user_id
+            ]),
+            json_encode([
+                'asset_name' => $record['asset_name'],
+                'asset_code' => $record['asset_code'],
+                'completion_notes' => $completion_notes
+            ])
+        ]);
+        
+        $db->commit();
+        
+        echo json_encode([
+            "success" => true,
+            "message" => "Maintenance closed successfully",
+            "maintenance_id" => $maintenance_id,
+            "actual_cost" => $actual_cost
         ]);
         
     } catch (Exception $e) {

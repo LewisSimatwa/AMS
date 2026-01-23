@@ -6,10 +6,12 @@ const Maintenance = () => {
   const [maintenanceRecords, setMaintenanceRecords] = useState([]);
   const [assets, setAssets] = useState([]);
   const [users, setUsers] = useState([]);
+  const [userRole, setUserRole] = useState(null);
   const [riskScores, setRiskScores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
   
   const [filters, setFilters] = useState({
@@ -24,13 +26,20 @@ const Maintenance = () => {
     description: '',
     start_date: '',
     assigned_to: '',
-    cost: ''
+    estimated_cost: ''
+  });
+
+  const [closeForm, setCloseForm] = useState({
+    maintenance_id: '',
+    actual_cost: '',
+    completion_notes: ''
   });
 
   const token = localStorage.getItem('token');
 
   useEffect(() => {
     fetchAllData();
+    fetchUserRole();
   }, []);
 
   const fetchAllData = async () => {
@@ -46,6 +55,18 @@ const Maintenance = () => {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUserRole = () => {
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        setUserRole(user.role || null);
+      }
+    } catch (error) {
+      console.error('Error fetching user role:', error);
     }
   };
 
@@ -138,6 +159,35 @@ const Maintenance = () => {
     }
   };
 
+  const handleCloseMaintenance = async (e) => {
+    e.preventDefault();
+    
+    try {
+      const response = await fetch('http://localhost:8000/maintenance.php?action=close', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(closeForm)
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        alert('Maintenance closed successfully!');
+        setShowCloseModal(false);
+        resetCloseForm();
+        fetchMaintenanceRecords();
+      } else {
+        alert(data.error || 'Failed to close maintenance');
+      }
+    } catch (error) {
+      console.error('Error closing maintenance:', error);
+      alert('Error closing maintenance');
+    }
+  };
+
   const resetScheduleForm = () => {
     setScheduleForm({
       asset_id: '',
@@ -145,8 +195,26 @@ const Maintenance = () => {
       description: '',
       start_date: '',
       assigned_to: '',
-      cost: ''
+      estimated_cost: ''
     });
+  };
+
+  const resetCloseForm = () => {
+    setCloseForm({
+      maintenance_id: '',
+      actual_cost: '',
+      completion_notes: ''
+    });
+  };
+
+  const openCloseModal = (record) => {
+    setCloseForm({
+      maintenance_id: record.id,
+      actual_cost: record.estimated_cost || '',
+      completion_notes: ''
+    });
+    setSelectedRecord(record);
+    setShowCloseModal(true);
   };
 
   const filteredRecords = maintenanceRecords.filter(record => {
@@ -168,10 +236,13 @@ const Maintenance = () => {
     const open = maintenanceRecords.filter(r => r.status === 'open').length;
     const inProgress = maintenanceRecords.filter(r => r.status === 'in_progress').length;
     const closed = maintenanceRecords.filter(r => r.status === 'closed').length;
-    const totalCost = maintenanceRecords.reduce((sum, r) => sum + parseFloat(r.cost || 0), 0);
-    const avgCost = total > 0 ? totalCost / total : 0;
+    
+    // Calculate costs in KSH
+    const totalEstimatedCost = maintenanceRecords.reduce((sum, r) => sum + parseFloat(r.estimated_cost || 0), 0);
+    const totalActualCost = maintenanceRecords.reduce((sum, r) => sum + parseFloat(r.actual_cost || 0), 0);
+    const avgCost = closed > 0 ? totalActualCost / closed : 0;
 
-    return { total, open, inProgress, closed, totalCost, avgCost };
+    return { total, open, inProgress, closed, totalEstimatedCost, totalActualCost, avgCost };
   };
 
   const stats = calculateStats();
@@ -180,7 +251,7 @@ const Maintenance = () => {
     setScheduleForm({
       ...scheduleForm,
       asset_id: assetId,
-      cost: ''
+      estimated_cost: ''
     });
     setShowScheduleModal(true);
   };
@@ -228,8 +299,8 @@ const Maintenance = () => {
           <div className="stat-value">{stats.closed}</div>
         </div>
         <div className="stat-card stat-card-purple">
-          <div className="stat-label">Total Cost</div>
-          <div className="stat-value">${stats.totalCost.toFixed(2)}</div>
+          <div className="stat-label">Total Actual Cost (KSH)</div>
+          <div className="stat-value">KSH {stats.totalActualCost.toLocaleString()}</div>
         </div>
       </div>
 
@@ -306,7 +377,8 @@ const Maintenance = () => {
                       <th>Description</th>
                       <th>Status</th>
                       <th>Start Date</th>
-                      <th>Cost</th>
+                      <th>Estimated Cost (KSH)</th>
+                      <th>Actual Cost (KSH)</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -331,18 +403,33 @@ const Maintenance = () => {
                           </span>
                         </td>
                         <td>{record.start_date || 'Not started'}</td>
-                        <td className="cost-cell">${parseFloat(record.cost || 0).toFixed(2)}</td>
+                        <td className="cost-cell">KSH {parseFloat(record.estimated_cost || 0).toLocaleString()}</td>
+                        <td className="cost-cell">
+                          {record.actual_cost ? `KSH ${parseFloat(record.actual_cost).toLocaleString()}` : '-'}
+                        </td>
                         <td>
-                          <button
-                            className="btn-icon"
-                            onClick={() => {
-                              setSelectedRecord(record);
-                              setShowDetailsModal(true);
-                            }}
-                            title="View Details"
-                          >
-                            👁️
-                          </button>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              className="btn-icon"
+                              onClick={() => {
+                                setSelectedRecord(record);
+                                setShowDetailsModal(true);
+                              }}
+                              title="View Details"
+                            >
+                              👁️
+                            </button>
+                            {record.status !== 'closed' && (userRole === 'ict' || userRole === 'admin') && (
+                              <button
+                                className="btn-icon"
+                                onClick={() => openCloseModal(record)}
+                                title="Close Maintenance"
+                                style={{ backgroundColor: '#10b981', color: 'white' }}
+                              >
+                                ✓
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -380,15 +467,19 @@ const Maintenance = () => {
                 </div>
 
                 <div className="summary-card">
-                  <h3 className="summary-title">Cost Analysis</h3>
+                  <h3 className="summary-title">Cost Analysis (KSH)</h3>
                   <div className="summary-list">
                     <div className="summary-item">
-                      <span className="summary-label">Total Cost</span>
-                      <span className="summary-value">${stats.totalCost.toFixed(2)}</span>
+                      <span className="summary-label">Total Estimated</span>
+                      <span className="summary-value">KSH {stats.totalEstimatedCost.toLocaleString()}</span>
+                    </div>
+                    <div className="summary-item">
+                      <span className="summary-label">Total Actual</span>
+                      <span className="summary-value">KSH {stats.totalActualCost.toLocaleString()}</span>
                     </div>
                     <div className="summary-item">
                       <span className="summary-label">Average Cost</span>
-                      <span className="summary-value">${stats.avgCost.toFixed(2)}</span>
+                      <span className="summary-value">KSH {stats.avgCost.toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
@@ -405,6 +496,7 @@ const Maintenance = () => {
                         <div className="activity-description">{record.description}</div>
                         <div className="activity-meta">
                           {record.start_date} • {record.maintenance_type}
+                          {record.actual_cost && ` • KSH ${parseFloat(record.actual_cost).toLocaleString()}`}
                         </div>
                       </div>
                       <span className={`badge badge-${record.status}`}>
@@ -550,13 +642,13 @@ const Maintenance = () => {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Estimated Cost</label>
+                <label className="form-label">Estimated Cost (KSH)</label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
-                  value={scheduleForm.cost}
-                  onChange={(e) => setScheduleForm({...scheduleForm, cost: e.target.value})}
+                  value={scheduleForm.estimated_cost}
+                  onChange={(e) => setScheduleForm({...scheduleForm, estimated_cost: e.target.value})}
                   className="input-field"
                   placeholder="0.00"
                 />
@@ -589,6 +681,77 @@ const Maintenance = () => {
                   type="button"
                   className="btn-secondary"
                   onClick={() => setShowScheduleModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Close Maintenance Modal */}
+      {showCloseModal && selectedRecord && (
+        <div className="modal-overlay" onClick={() => setShowCloseModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Close Maintenance</h3>
+              <button
+                className="modal-close"
+                onClick={() => setShowCloseModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleCloseMaintenance} className="modal-content">
+              <div className="detail-item" style={{ marginBottom: '16px' }}>
+                <span className="detail-label">Asset:</span>
+                <span className="detail-value">{selectedRecord.asset_name} ({selectedRecord.asset_code})</span>
+              </div>
+              
+              <div className="detail-item" style={{ marginBottom: '16px' }}>
+                <span className="detail-label">Description:</span>
+                <span className="detail-value">{selectedRecord.description}</span>
+              </div>
+
+              <div className="detail-item" style={{ marginBottom: '24px' }}>
+                <span className="detail-label">Estimated Cost:</span>
+                <span className="detail-value">KSH {parseFloat(selectedRecord.estimated_cost || 0).toLocaleString()}</span>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Actual Cost (KSH) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={closeForm.actual_cost}
+                  onChange={(e) => setCloseForm({...closeForm, actual_cost: e.target.value})}
+                  className="input-field"
+                  placeholder="Enter actual cost incurred"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Completion Notes</label>
+                <textarea
+                  value={closeForm.completion_notes}
+                  onChange={(e) => setCloseForm({...closeForm, completion_notes: e.target.value})}
+                  className="input-field textarea-field"
+                  rows="4"
+                  placeholder="Add any notes about the completed maintenance work..."
+                ></textarea>
+              </div>
+
+              <div className="modal-actions">
+                <button type="submit" className="btn-primary">
+                  Close Maintenance
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowCloseModal(false)}
                 >
                   Cancel
                 </button>
@@ -640,8 +803,14 @@ const Maintenance = () => {
                   <span className="detail-value">{selectedRecord.end_date || 'In progress'}</span>
                 </div>
                 <div className="detail-item">
-                  <span className="detail-label">Cost:</span>
-                  <span className="detail-value">${parseFloat(selectedRecord.cost || 0).toFixed(2)}</span>
+                  <span className="detail-label">Estimated Cost:</span>
+                  <span className="detail-value">KSH {parseFloat(selectedRecord.estimated_cost || 0).toLocaleString()}</span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Actual Cost:</span>
+                  <span className="detail-value">
+                    {selectedRecord.actual_cost ? `KSH ${parseFloat(selectedRecord.actual_cost).toLocaleString()}` : 'Not completed'}
+                  </span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Reported By:</span>
@@ -651,11 +820,33 @@ const Maintenance = () => {
                   <span className="detail-label">Assigned To:</span>
                   <span className="detail-value">{selectedRecord.assigned_to_name || 'N/A'}</span>
                 </div>
+                {selectedRecord.closed_by_name && (
+                  <>
+                    <div className="detail-item">
+                      <span className="detail-label">Closed By:</span>
+                      <span className="detail-value">{selectedRecord.closed_by_name}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Closed At:</span>
+                      <span className="detail-value">{selectedRecord.closed_at}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Actual Completion:</span>
+                      <span className="detail-value">{selectedRecord.actual_completion_date}</span>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="detail-full">
                 <span className="detail-label">Description:</span>
                 <div className="detail-description">{selectedRecord.description}</div>
               </div>
+              {selectedRecord.completion_notes && (
+                <div className="detail-full">
+                  <span className="detail-label">Completion Notes:</span>
+                  <div className="detail-description">{selectedRecord.completion_notes}</div>
+                </div>
+              )}
               <button
                 className="btn-secondary btn-full"
                 onClick={() => setShowDetailsModal(false)}
