@@ -57,6 +57,13 @@ export default function Login() {
         localStorage.setItem("institutionId", response.user.institution_id);
       }
       
+      // Store institution name if available
+      if (response.institution_name) {
+        localStorage.setItem("institutionName", response.institution_name);
+      } else if (response.user.institution_name) {
+        localStorage.setItem("institutionName", response.user.institution_name);
+      }
+      
       // Route based on user role
       const userRole = response.user.role?.toLowerCase();
       console.log("User role:", userRole);

@@ -64,6 +64,7 @@ if (!function_exists('generateToken')) {
         $header = json_encode(['alg' => 'HS256', 'typ' => 'JWT']);
         $payload = json_encode([
             'user_id' => $user['id'],
+            'username' => $user['username'] ?? 'unknown',  // Add username to token
             'role' => $user['role'],
             'institution_id' => $user['institution_id'],
             'iat' => time(),
@@ -130,11 +131,23 @@ if (!function_exists('verifyAuth')) {
             
             error_log("Token verified successfully for user_id: " . $decoded['user_id']);
             
+            // Set $_GET for backward compatibility
             $_GET['user_id'] = $decoded['user_id'];
             $_GET['role'] = $decoded['role'];
             $_GET['institution_id'] = $decoded['institution_id'];
             
-            return $decoded;
+            // IMPORTANT: Return properly formatted currentUser array
+            $currentUser = [
+                'id' => $decoded['user_id'],
+                'username' => $decoded['username'] ?? 'unknown',
+                'institution_id' => $decoded['institution_id'],
+                'role' => $decoded['role']
+            ];
+            
+            error_log("Returning currentUser: " . json_encode($currentUser));
+            
+            return $currentUser;
+            
         } catch (Exception $e) {
             error_log("Token verification failed: " . $e->getMessage());
             respond(['error' => 'Invalid token: ' . $e->getMessage()], 401);

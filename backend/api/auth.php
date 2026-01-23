@@ -43,6 +43,8 @@ function login() {
         // Check if this is a super admin login (no domain lookup needed)
         $isSuperAdminAttempt = strpos($email, 'super@') !== false;
 
+        $institution_name = null; // Initialize institution_name
+
         if ($isSuperAdminAttempt) {
             // Super admin login - institution_id should be NULL
             $sql = "SELECT u.id, u.email, u.username, u.first_name, u.last_name, u.password_hash, 
@@ -73,15 +75,15 @@ function login() {
             }
 
             $institution_id = $institution['id'];
+            $institution_name = $institution['name']; // Store institution name
             error_log("auth.php login: Found institution_id: " . $institution_id . " for domain: " . $domain);
 
             // Now lookup user with this email and institution
             $sql = "SELECT u.id, u.email, u.username, u.first_name, u.last_name, u.password_hash, 
-                           r.name AS role, u.institution_id, i.name as institution_name
+                           r.name AS role, u.institution_id
                     FROM users u
                     LEFT JOIN user_roles ur ON u.id = ur.user_id
                     LEFT JOIN roles r ON ur.role_id = r.id
-                    LEFT JOIN institutions i ON u.institution_id = i.id
                     WHERE u.email = ? AND u.institution_id = ?
                     LIMIT 1";
 
@@ -115,13 +117,13 @@ function login() {
 
         // Remove sensitive data from response
         unset($user['password_hash']);
-        unset($user['institution_name']);
 
         error_log("auth.php login: Login successful for - " . $email . " with role: " . $user['role']);
 
         respond([
             'token' => $token,
-            'user' => $user
+            'user' => $user,
+            'institution_name' => $institution_name  // Add institution_name to response
         ]);
     } catch (Exception $e) {
         error_log('auth.php login error: ' . $e->getMessage());

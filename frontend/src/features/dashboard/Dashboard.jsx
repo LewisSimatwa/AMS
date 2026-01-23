@@ -19,6 +19,7 @@ export default function Dashboard() {
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const institutionId = localStorage.getItem("institutionId");
+  const institutionName = localStorage.getItem("institutionName") || "Your Institution";
 
   useEffect(() => {
     if (!token || !institutionId) {
@@ -173,6 +174,15 @@ export default function Dashboard() {
         <div>
           <h1>Dashboard</h1>
           <p>Welcome back, {user.email || "User"}</p>
+        </div>
+        <div style={{ 
+          fontSize: '1.5rem',
+          fontWeight: '600',
+          color: '#2563eb',
+          margin: '0.5rem 0',
+          textAlign: 'center'
+        }}>
+          {institutionName}
         </div>
         <button className="refresh-btn" onClick={fetchDashboardData}>
           Refresh

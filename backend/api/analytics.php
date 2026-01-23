@@ -6,7 +6,7 @@ require __DIR__ . '/cors.php';
  * MIAMS - Analytics API Handler
  * Handles analytics endpoints and connects to Python analytics microservice
  * 
- * This file is called from index.php via handleAnalytics($db, $method, $path)
+ * This file is called from index.php via handleAnalytics($db, $method, $path, $currentUser)
  */
 
 // Configuration for Analytics Service
@@ -53,15 +53,18 @@ function callAnalyticsService($endpoint, $method = 'GET', $data = null) {
 
 /**
  * Main handler function called from index.php
+ * 
+ * @param PDO $db Database connection
+ * @param string $method HTTP method
+ * @param string $path Request path
+ * @param array $currentUser Current authenticated user data
  */
-function handleAnalytics($db, $method, $path) {
-    global $currentUser;
-    
+function handleAnalytics($db, $method, $path, $currentUser = null) {
     error_log("=== Analytics API Called ===");
     error_log("Path: {$path}, Method: {$method}");
     error_log("Current user set: " . (isset($currentUser) ? 'YES' : 'NO'));
     
-    // Verify user is authenticated (should already be done in index.php)
+    // Verify user is authenticated
     if (!isset($currentUser) || !$currentUser) {
         error_log("ERROR: currentUser not set in analytics.php");
         error_log("Headers: " . json_encode(getallheaders()));
@@ -201,6 +204,45 @@ function handleAnalytics($db, $method, $path) {
             error_log("Fetching details for asset: {$assetId}");
             $result = callAnalyticsService("/asset-details/{$assetId}");
             respond($result);
+            return;
+        }
+        
+        // Route: GET /api/analytics/risk-scores
+        if ($endpoint === 'risk-scores' && $method === 'GET') {
+            error_log("Fetching risk scores for institution: {$institutionId}");
+            
+            $stmt = $db->prepare("
+                SELECT 
+                    a.id,
+                    a.asset_code,
+                    a.name,
+                    a.status,
+                    a.condition,
+                    ars.risk_level,
+                    ars.risk_score,
+                    ars.predicted_failure_date,
+                    ars.predicted_at as last_calculated,
+                    ars.model_version,
+                    d.name as department_name,
+                    d.code as department_code
+                FROM asset_risk_scores ars
+                JOIN assets a ON ars.asset_id = a.id
+                LEFT JOIN departments d ON a.department_id = d.id
+                WHERE ars.institution_id = :institution_id
+                    AND a.status != 'disposed'
+                    AND a.status != 'retired'
+                ORDER BY ars.risk_score DESC
+            ");
+            $stmt->execute(['institution_id' => $institutionId]);
+            $scores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            error_log("Found " . count($scores) . " risk scores");
+            
+            respond([
+                'success' => true,
+                'scores' => $scores,
+                'count' => count($scores)
+            ]);
             return;
         }
         
@@ -375,6 +417,7 @@ function handleAnalytics($db, $method, $path) {
                 'GET /api/analytics/health',
                 'GET /api/analytics/summary',
                 'GET /api/analytics/dashboard',
+                'GET /api/analytics/risk-scores',
                 'GET /api/analytics/risk-alerts',
                 'GET /api/analytics/trends',
                 'GET /api/analytics/department-risks',

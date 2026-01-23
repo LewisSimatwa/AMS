@@ -56,7 +56,8 @@ try {
     // PROTECTED ROUTES (TOKEN REQUIRED)
     // ============================================
     else {
-        verifyAuth();
+        // Verify authentication and get current user
+        $currentUser = verifyAuth();
 
         // ----------------------------------------
         // ASSET MANAGEMENT ROUTES
@@ -94,7 +95,7 @@ try {
         // ----------------------------------------
         elseif (strpos($path, '/analytics') === 0) {
             require 'analytics.php';
-            handleAnalytics($db, $method, $path);
+            handleAnalytics($db, $method, $path, $currentUser); // CHANGED: Added $currentUser parameter
         }
 
         // ----------------------------------------
@@ -150,11 +151,8 @@ try {
         // SUPER ADMIN ROUTES
         // ----------------------------------------
         elseif (strpos($path, '/super_admin') === 0) {
-            // Verify authentication first
-            $decoded = verifyAuth();
-            
             // Verify super admin role
-            if (!isset($decoded['role']) || $decoded['role'] !== 'super_admin') {
+            if (!isset($currentUser['role']) || $currentUser['role'] !== 'super_admin') {
                 respond(['error' => 'Access denied. Super admin privileges required.'], 403);
             }
 

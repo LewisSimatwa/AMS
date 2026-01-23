@@ -23,7 +23,7 @@ export default function CheckoutModule() {
   // Checkin form state
   const [checkinForm, setCheckinForm] = useState({
     assetId: "",
-    condition: "good",
+    condition: "",
     remarks: ""
   });
   
