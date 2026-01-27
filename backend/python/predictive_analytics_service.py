@@ -61,11 +61,11 @@ def extract_features_for_asset(conn, asset_id, institution_id):
     """, (asset_id,))
     usage = cursor.fetchone()
     
-    # Count maintenance records
+    # Count maintenance records - FIX: Use actual_cost instead of cost
     cursor.execute("""
         SELECT 
             COUNT(*) as repairs_count,
-            AVG(cost) as avg_cost,
+            AVG(COALESCE(actual_cost, estimated_cost, 0)) as avg_cost,
             MAX(end_date) as last_maintenance
         FROM maintenance_records
         WHERE asset_id = %s AND created_at >= CURRENT_DATE - INTERVAL '90 days'
@@ -170,47 +170,66 @@ def health_check():
 def extract_features(institution_id):
     """Extract features for all assets in an institution"""
     try:
+        print(f"\n=== Extracting features for institution {institution_id} ===")
         conn = get_db_connection()
+        print("✓ Database connection successful")
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Get all active assets
+        # Get ALL assets for this institution (simpler query)
         cursor.execute("""
-            SELECT id FROM assets 
-            WHERE institution_id = %s AND status != 'disposed'
+            SELECT id, status FROM assets 
+            WHERE institution_id = %s
         """, (institution_id,))
-        assets = cursor.fetchall()
+        all_assets = cursor.fetchall()
+        print(f"✓ Total assets in institution: {len(all_assets)}")
+        
+        if len(all_assets) > 0:
+            print(f"  First asset: ID={all_assets[0]['id']}, Status={all_assets[0]['status']}")
+        
+        # Filter out retired/disposed assets
+        assets = [a for a in all_assets if a['status'] not in ['retired', 'disposed']]
+        print(f"✓ Active assets to process: {len(assets)}")
         
         features_list = []
-        for asset in assets:
-            features = extract_features_for_asset(conn, asset['id'], institution_id)
-            if features:
-                # Store in predictive_features table
-                cursor.execute("""
-                    INSERT INTO predictive_features 
-                    (institution_id, asset_id, feature_date, usage_count, 
-                     repairs_last_90d, avg_time_between_repairs, last_maintenance_date,
-                     asset_age_months, avg_maintenance_cost)
-                    VALUES (%s, %s, CURRENT_DATE, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (asset_id, feature_date) 
-                    DO UPDATE SET
-                        usage_count = EXCLUDED.usage_count,
-                        repairs_last_90d = EXCLUDED.repairs_last_90d,
-                        avg_time_between_repairs = EXCLUDED.avg_time_between_repairs,
-                        last_maintenance_date = EXCLUDED.last_maintenance_date,
-                        asset_age_months = EXCLUDED.asset_age_months,
-                        avg_maintenance_cost = EXCLUDED.avg_maintenance_cost
-                """, (
-                    institution_id, features['asset_id'], features['usage_count'],
-                    features['repairs_last_90d'], features['avg_time_between_repairs'],
-                    features['last_maintenance_date'], features['age_months'],
-                    features['avg_maintenance_cost']
-                ))
-                features_list.append(features)
+        for i, asset in enumerate(assets, 1):
+            print(f"Processing asset {i}/{len(assets)}: ID {asset['id']}")
+            try:
+                features = extract_features_for_asset(conn, asset['id'], institution_id)
+                if features:
+                    # Store in predictive_features table
+                    cursor.execute("""
+                        INSERT INTO predictive_features 
+                        (institution_id, asset_id, feature_date, usage_count, 
+                         repairs_last_90d, avg_time_between_repairs, last_maintenance_date,
+                         asset_age_months, avg_maintenance_cost)
+                        VALUES (%s, %s, CURRENT_DATE, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (asset_id, feature_date) 
+                        DO UPDATE SET
+                            usage_count = EXCLUDED.usage_count,
+                            repairs_last_90d = EXCLUDED.repairs_last_90d,
+                            avg_time_between_repairs = EXCLUDED.avg_time_between_repairs,
+                            last_maintenance_date = EXCLUDED.last_maintenance_date,
+                            asset_age_months = EXCLUDED.asset_age_months,
+                            avg_maintenance_cost = EXCLUDED.avg_maintenance_cost
+                    """, (
+                        institution_id, features['asset_id'], features['usage_count'],
+                        features['repairs_last_90d'], features['avg_time_between_repairs'],
+                        features['last_maintenance_date'], features['age_months'],
+                        features['avg_maintenance_cost']
+                    ))
+                    features_list.append(features)
+                    print(f"  ✓ Stored features for asset {asset['id']}")
+            except Exception as asset_error:
+                print(f"  ✗ Error processing asset {asset['id']}: {str(asset_error)}")
+                import traceback
+                traceback.print_exc()
+                continue
         
         conn.commit()
         cursor.close()
         conn.close()
         
+        print(f"✓ Successfully extracted features for {len(features_list)} assets\n")
         return jsonify({
             'success': True,
             'features_extracted': len(features_list),
@@ -218,52 +237,81 @@ def extract_features(institution_id):
         })
     
     except Exception as e:
+        print(f"\n✗ ERROR in extract_features: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print()
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/api/analytics/calculate-risks/<int:institution_id>', methods=['POST'])
 def calculate_risks(institution_id):
     """Calculate risk scores for all assets"""
     try:
+        print(f"\n=== Calculating risks for institution {institution_id} ===")
         conn = get_db_connection()
+        print("✓ Database connection successful")
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Get all assets with features
+        # Get ALL assets for this institution (simpler query)
         cursor.execute("""
-            SELECT id FROM assets 
-            WHERE institution_id = %s AND status != 'disposed'
+            SELECT id, status FROM assets 
+            WHERE institution_id = %s
         """, (institution_id,))
-        assets = cursor.fetchall()
+        all_assets = cursor.fetchall()
+        print(f"✓ Total assets in institution: {len(all_assets)}")
+        
+        # Filter out retired/disposed assets
+        assets = [a for a in all_assets if a['status'] not in ['retired', 'disposed']]
+        print(f"✓ Active assets to process: {len(assets)}")
         
         risk_scores = []
-        for asset in assets:
-            features = extract_features_for_asset(conn, asset['id'], institution_id)
-            if features:
-                risk_score = calculate_risk_score(features)
-                risk_level = get_risk_level(risk_score)
-                failure_date = predict_failure_date(features, risk_score)
-                
-                # Store risk score
-                cursor.execute("""
-                    INSERT INTO asset_risk_scores
-                    (institution_id, asset_id, risk_score, risk_level, 
-                     predicted_failure_date, model_version)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (
-                    institution_id, asset['id'], risk_score, risk_level,
-                    failure_date, 'v1.0'
-                ))
-                
-                risk_scores.append({
-                    'asset_id': asset['id'],
-                    'risk_score': round(risk_score, 4),
-                    'risk_level': risk_level,
-                    'predicted_failure_date': failure_date.isoformat() if failure_date else None
-                })
+        for i, asset in enumerate(assets, 1):
+            print(f"Processing asset {i}/{len(assets)}: ID {asset['id']}")
+            try:
+                features = extract_features_for_asset(conn, asset['id'], institution_id)
+                if features:
+                    risk_score = calculate_risk_score(features)
+                    risk_level = get_risk_level(risk_score)
+                    failure_date = predict_failure_date(features, risk_score)
+                    
+                    print(f"  Risk: {risk_level} ({risk_score:.4f})")
+                    
+                    # Delete old entries to avoid duplicates
+                    cursor.execute("""
+                        DELETE FROM asset_risk_scores 
+                        WHERE asset_id = %s AND institution_id = %s
+                    """, (asset['id'], institution_id))
+                    
+                    # Store risk score
+                    cursor.execute("""
+                        INSERT INTO asset_risk_scores
+                        (institution_id, asset_id, risk_score, risk_level, 
+                         predicted_failure_date, model_version)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (
+                        institution_id, asset['id'], risk_score, risk_level,
+                        failure_date, 'v1.0'
+                    ))
+                    
+                    risk_scores.append({
+                        'asset_id': asset['id'],
+                        'risk_score': round(risk_score, 4),
+                        'risk_level': risk_level,
+                        'predicted_failure_date': failure_date.isoformat() if failure_date else None
+                    })
+                    print(f"  ✓ Stored risk score for asset {asset['id']}")
+            except Exception as asset_error:
+                print(f"  ✗ Error processing asset {asset['id']}: {str(asset_error)}")
+                import traceback
+                traceback.print_exc()
+                continue
         
         conn.commit()
         cursor.close()
         conn.close()
         
+        print(f"✓ Successfully calculated risks for {len(risk_scores)} assets\n")
         return jsonify({
             'success': True,
             'risks_calculated': len(risk_scores),
@@ -271,6 +319,10 @@ def calculate_risks(institution_id):
         })
     
     except Exception as e:
+        print(f"\n✗ ERROR in calculate_risks: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/analytics/dashboard/<int:institution_id>', methods=['GET'])
