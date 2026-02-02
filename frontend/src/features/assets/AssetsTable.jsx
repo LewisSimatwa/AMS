@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "../../styles/AssetsTable.css";
+import "../../styles/Barcode.css";
 
 export default function AssetTable({ onView, onRetire, refreshTrigger }) {
   const navigate = useNavigate();
@@ -10,6 +11,8 @@ export default function AssetTable({ onView, onRetire, refreshTrigger }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState("all"); // all, active, retired
   const [userRole, setUserRole] = useState("");
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState(null);
 
   const token = localStorage.getItem("token");
   const institutionId = localStorage.getItem("institutionId");
@@ -59,6 +62,22 @@ export default function AssetTable({ onView, onRetire, refreshTrigger }) {
       setLoading(false);
     }
   }
+
+  // Handle viewing barcode
+  const handleViewBarcode = (asset) => {
+    console.log("Opening barcode for asset:", asset);
+    console.log("Barcode URL:", getBarcodeUrl(asset));
+    setSelectedAsset(asset);
+    setShowBarcodeModal(true);
+  };
+
+  // Get barcode URL with authentication parameters
+  const getBarcodeUrl = (asset) => {
+    // Include token in URL since img tags can't send Authorization headers
+    const url = `http://localhost:8000/api/barcode?asset_id=${asset.id}&institution_id=${institutionId}&token=${token}`;
+    console.log("Generated barcode URL:", url);
+    return url;
+  };
 
   // Filter assets based on status and search term
   const filteredAssets = assets.filter((asset) => {
@@ -185,14 +204,14 @@ export default function AssetTable({ onView, onRetire, refreshTrigger }) {
                   </td>
                   <td className="actions">
                     <button 
-                      onClick={() => onView(asset)} 
+                      onClick={() => handleViewBarcode(asset)} 
                       className="btn-view"
-                      title="View details"
+                      title="View barcode"
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M8 3.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9zM0 8a8 8 0 1116 0A8 8 0 010 8zm8-3a3 3 0 100 6 3 3 0 000-6z"/>
+                        <path d="M0 2h2v12H0V2zm3 0h1v12H3V2zm2 0h1v12H5V2zm2 0h2v12H7V2zm3 0h1v12h-1V2zm2 0h2v12h-2V2zm3 0h1v12h-1V2z"/>
                       </svg>
-                      View
+                      Barcode
                     </button>
 
                     {userRole === "admin" && !isRetired && (
@@ -226,6 +245,70 @@ export default function AssetTable({ onView, onRetire, refreshTrigger }) {
 
       {filteredAssets.length === 0 && searchTerm && (
         <p className="no-results">No assets found matching "{searchTerm}"</p>
+      )}
+
+      {/* Barcode Modal */}
+      {showBarcodeModal && selectedAsset && (
+        <div className="modal-overlay" onClick={() => setShowBarcodeModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Asset Barcode</h3>
+              <button 
+                className="modal-close" 
+                onClick={() => setShowBarcodeModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="barcode-info">
+                <p><strong>Asset:</strong> {selectedAsset.name}</p>
+                <p><strong>Asset Code:</strong> {selectedAsset.asset_code}</p>
+                <p>
+                  <strong>Barcode Data:</strong> {selectedAsset.serial_number || selectedAsset.asset_code}
+                </p>
+              </div>
+              <div className="barcode-container">
+                <img 
+                  src={getBarcodeUrl(selectedAsset)}
+                  alt={`Barcode for ${selectedAsset.asset_code}`}
+                  style={{ width: '100%', maxWidth: '400px', margin: '20px auto', display: 'block' }}
+                  onLoad={() => console.log('Barcode loaded successfully')}
+                  onError={(e) => {
+                    console.error('Failed to load barcode image');
+                    console.error('Image src:', e.target.src);
+                    console.error('Error event:', e);
+                    
+                    // Try to fetch the URL to see what error we get
+                    fetch(getBarcodeUrl(selectedAsset))
+                      .then(response => {
+                        console.log('Fetch response status:', response.status);
+                        console.log('Fetch response headers:', response.headers);
+                        return response.text();
+                      })
+                      .then(text => {
+                        console.log('Response body:', text);
+                      })
+                      .catch(err => {
+                        console.error('Fetch error:', err);
+                      });
+                    
+                    e.target.alt = 'Error loading barcode - check console';
+                  }}
+                />
+              </div>
+              <div className="barcode-actions">
+                <a
+                  href={getBarcodeUrl(selectedAsset)}
+                  download={`barcode_${selectedAsset.asset_code}.svg`}
+                  className="btn-download"
+                >
+                  Download Barcode
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -51,6 +51,11 @@ try {
     } elseif ($path === '/public-institutions' && $method === 'GET') {
         require __DIR__ . '/public-institutions.php';
     }
+        elseif ($path === '/barcode' && $method === 'GET') {
+        require __DIR__ . '/barcode.php';
+    } elseif ($path === '/barcode.php' && $method === 'GET') {
+        require __DIR__ . '/barcode.php';
+    }
 
     // ============================================
     // PROTECTED ROUTES (TOKEN REQUIRED)
@@ -58,6 +63,7 @@ try {
     else {
         // Verify authentication and get current user
         $currentUser = verifyAuth();
+
 
         // ----------------------------------------
         // ASSET MANAGEMENT ROUTES
@@ -72,7 +78,7 @@ try {
         } elseif (strpos($path, '/assets') === 0) {
             require 'assets.php';
             handleAssets($db, $method, $path);
-        }
+        } 
 
         // ----------------------------------------
         // TRANSACTION ROUTES

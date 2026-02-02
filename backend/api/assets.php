@@ -84,6 +84,12 @@ function handleAssets($db, $method, $path) {
                 respond(['error' => 'Asset code already exists'], 400);
             }
             
+            // Generate serial number if not provided
+            $serialNumber = $input['serial_number'] ?? null;
+            if (empty($serialNumber)) {
+                $serialNumber = generateSerialNumber($db, $institutionId, $input['asset_code']);
+            }
+            
             // Get or create asset type
             $assetTypeId = null;
             if (!empty($input['category'])) {
@@ -115,7 +121,7 @@ function handleAssets($db, $method, $path) {
             
             $db->beginTransaction();
             
-            // Insert asset (including location_id)
+            // Insert asset (including location_id and generated serial_number)
             $stmt = $db->prepare("
                 INSERT INTO assets (
                     institution_id,
@@ -139,7 +145,7 @@ function handleAssets($db, $method, $path) {
                 $institutionId,
                 $assetTypeId,
                 $input['asset_code'],
-                $input['serial_number'] ?? null,
+                $serialNumber,  // Use generated serial number
                 $input['name'],
                 $input['description'] ?? null,
                 $input['purchase_date'] ?? null,
@@ -151,7 +157,7 @@ function handleAssets($db, $method, $path) {
             
             $assetId = $stmt->fetchColumn();
             
-            error_log("Asset created with ID: $assetId");
+            error_log("Asset created with ID: $assetId, Serial Number: $serialNumber");
             
             // Create audit log
             try {
@@ -174,6 +180,7 @@ function handleAssets($db, $method, $path) {
                     $assetId,
                     json_encode([
                         'asset_code' => $input['asset_code'],
+                        'serial_number' => $serialNumber,
                         'name' => $input['name'],
                         'status' => $input['status'] ?? 'available'
                     ])
@@ -336,6 +343,57 @@ function handleAssets($db, $method, $path) {
     
     else {
         respond(['error' => 'Invalid route or method for assets'], 404);
+    }
+}
+
+/**
+ * Generate a unique serial number for an asset
+ * Format: SN-{YEAR}-{INSTITUTION_CODE}-{SEQUENCE}
+ * Example: SN-2026-NUNI-00001
+ */
+function generateSerialNumber($db, $institutionId, $assetCode) {
+    try {
+        // Get institution code
+        $instStmt = $db->prepare("SELECT code FROM institutions WHERE id = ?");
+        $instStmt->execute([$institutionId]);
+        $institution = $instStmt->fetch(PDO::FETCH_ASSOC);
+        $instCode = $institution['code'] ?? 'INST';
+        
+        // Get current year
+        $year = date('Y');
+        
+        // Get the count of assets for this institution to generate sequence
+        $countStmt = $db->prepare("
+            SELECT COUNT(*) as count 
+            FROM assets 
+            WHERE institution_id = ? 
+            AND EXTRACT(YEAR FROM created_at) = ?
+        ");
+        $countStmt->execute([$institutionId, $year]);
+        $result = $countStmt->fetch(PDO::FETCH_ASSOC);
+        $sequence = ($result['count'] ?? 0) + 1;
+        
+        // Format: SN-2026-NUNI-00001
+        $serialNumber = sprintf("SN-%s-%s-%05d", $year, $instCode, $sequence);
+        
+        // Check if this serial number already exists (very unlikely but just to be safe)
+        $checkStmt = $db->prepare("
+            SELECT id FROM assets 
+            WHERE serial_number = ? AND institution_id = ?
+        ");
+        $checkStmt->execute([$serialNumber, $institutionId]);
+        
+        // If it exists, add a timestamp suffix
+        if ($checkStmt->fetch()) {
+            $serialNumber .= '-' . time();
+        }
+        
+        return $serialNumber;
+        
+    } catch (PDOException $e) {
+        error_log("Error generating serial number: " . $e->getMessage());
+        // Fallback to a simple timestamp-based serial number
+        return 'SN-' . date('YmdHis') . '-' . rand(1000, 9999);
     }
 }
 ?>
