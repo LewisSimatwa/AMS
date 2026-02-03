@@ -131,6 +131,12 @@ if (!function_exists('verifyAuth')) {
             
             error_log("Token verified successfully for user_id: " . $decoded['user_id']);
             
+            // Check if user has a role assigned
+            if (empty($decoded['role']) || $decoded['role'] === null || $decoded['role'] === '') {
+                error_log("Access denied: User has no role assigned (user_id: " . $decoded['user_id'] . ")");
+                respond(['error' => 'Access denied: No role assigned to your account. Please contact your administrator.'], 403);
+            }
+            
             // Set $_GET for backward compatibility
             $_GET['user_id'] = $decoded['user_id'];
             $_GET['role'] = $decoded['role'];

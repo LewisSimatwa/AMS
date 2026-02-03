@@ -253,7 +253,7 @@ export default function AssetRegistrationForm({ onAssetAdded }) {
             <div className="form-group">
               <label htmlFor="purchase_cost">Purchase Cost</label>
               <div className="input-with-prefix">
-                <span className="prefix">$</span>
+                <span className="prefix"></span>
                 <input
                   id="purchase_cost"
                   name="purchase_cost"
