@@ -97,21 +97,21 @@ export default function Login() {
           <div className="logo-wrapper">
             <div className="logo-glow"></div>
             <div className="logo-container">
-              <img src="frontend\public\miams_logo.svg" alt="MIAMS Logo" className="logo-image" />
+              <img src="frontend\public\amslogo.png" alt="MIAMS Logo" className="logo-image" />
             </div>
           </div>
           <div className="brand-text">
-            <h2 className="brand-title">MIAMS</h2>
+            <h2 className="brand-title">AMS</h2>
             <p className="brand-subtitle">
-              Multi-institutional Asset Management System
+              Asset Management System
             </p>
           </div>
         </div>
       </div>
 
       <div className="login-right">
-        <div className="form-wrapper">
-          <div className="login-card">
+        <div className="form-wrapper" >
+          <div className="login-card" style={{ transform: "translateY(-60px)" }} >
             <div className="card-header">
               <h1 className="card-title">Welcome Back</h1>
               <p className="card-subtitle">Sign in to access your account</p>
@@ -222,10 +222,6 @@ export default function Login() {
               </Link>
             </div>
           </div>
-
-          <p className="footer-text">
-            Protected by industry-standard encryption
-          </p>
         </div>
       </div>
     </div>

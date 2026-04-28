@@ -21,7 +21,6 @@ System Architecture
 • Backend: PHP (REST APIs)
 • Predictive Analytics: Python
 • Database: PostgreSQL
-• Auth: JWT + Institution context headers
 
 ---
 

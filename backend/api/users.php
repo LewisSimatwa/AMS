@@ -119,7 +119,7 @@ try {
     
     if ($action === 'get_departments') {
         error_log("Public action: get_departments");
-        // Get all departments (or limit to first 50 for testing)
+        // Get all departments
         $stmt = $db->query("SELECT id, name, code FROM departments ORDER BY name LIMIT 50");
         $departments = $stmt->fetchAll(PDO::FETCH_ASSOC);
         

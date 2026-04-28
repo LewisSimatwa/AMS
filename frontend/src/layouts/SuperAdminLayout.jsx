@@ -58,11 +58,11 @@ export default function SuperAdminLayout() {
       icon: Building2,
       label: "Institutions"
     },
-    {
-      path: "/super-admin/assets",
-      icon: Package,
-      label: "Global Assets"
-    },
+    // {
+    //   path: "/super-admin/assets",
+    //   icon: Package,
+    //   label: "Global Assets"
+    // },
     {
       path: "/super-admin/importcsv",
       icon: Import,
@@ -73,11 +73,11 @@ export default function SuperAdminLayout() {
       icon: Shield,
       label: "Reports and Audits"
     },
-    {
-      path: "/super-admin/settings",
-      icon: SettingsIcon,
-      label: "System Settings"
-    }
+    // {
+    //   path: "/super-admin/settings",
+    //   icon: SettingsIcon,
+    //   label: "System Settings"
+    // }
   ];
 
   const isActive = (path) => location.pathname === path;

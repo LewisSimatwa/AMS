@@ -514,9 +514,6 @@ const Maintenance = () => {
             <div className="tab-panel">
               <div className="predictive-header">
                 <h2 className="predictive-title">Predictive Maintenance Insights</h2>
-                <p className="predictive-subtitle">
-                  AI-powered predictions to identify assets at risk of failure
-                </p>
               </div>
 
               <div className="risk-list">

@@ -7,7 +7,7 @@ export default function MainLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
-  const user = JSON.parse(localStorage.getItem("user")) || { name: "John Doe" };
+  const user = JSON.parse(localStorage.getItem("user")) || { name: "!User!" };
 
   useEffect(() => {
     const handlePopState = () => {

@@ -5,10 +5,10 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173, // Add this line
+    port: 5173,
     host: true, // allow access from network
-    allowedHosts: ['arachidic-awedly-bell.ngrok-free.dev'], // add your ngrok host here
-    strictPort: true, // Change to true so it fails if port is taken
+    allowedHosts: ['arachidic-awedly-bell.ngrok-free.dev'], 
+    strictPort: true, 
     proxy: {
       '/backend': {
         target: 'http://localhost:8000',

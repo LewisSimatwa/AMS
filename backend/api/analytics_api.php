@@ -1,6 +1,5 @@
 <?php
 /**
- * MIAMS - Analytics API
  * Handles analytics endpoints and connects to Python analytics microservice
  */
 

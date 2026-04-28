@@ -121,6 +121,15 @@ try {
         }
 
         // ----------------------------------------
+        // DEPARTMENT MANAGEMENT ROUTES (ADMIN ONLY)
+        // ----------------------------------------
+        elseif ($path === '/departments.php' && in_array($method, ['GET', 'POST'])) {
+            require 'departments.php';
+        } elseif (strpos($path, '/departments') === 0) {
+            require 'departments.php';
+        }
+
+        // ----------------------------------------
         // USER MANAGEMENT ROUTES (ADMIN ONLY)
         // ----------------------------------------
         elseif ($path === '/users.php' && in_array($method, ['GET','POST'])) {

@@ -1,8 +1,6 @@
 <?php
-// NO WHITESPACE BEFORE THIS LINE!
-
 // Secret key for JWT
-if (!defined('JWT_SECRET')) define('JWT_SECRET', 'replace_this_with_your_secret');
+//if (!defined('JWT_SECRET')) define('JWT_SECRET', 'replace_this_with_your_secret');
 
 // -------------------
 // Header Helper Function
@@ -142,7 +140,7 @@ if (!function_exists('verifyAuth')) {
             $_GET['role'] = $decoded['role'];
             $_GET['institution_id'] = $decoded['institution_id'];
             
-            // IMPORTANT: Return properly formatted currentUser array
+            // Return properly formatted currentUser array
             $currentUser = [
                 'id' => $decoded['user_id'],
                 'username' => $decoded['username'] ?? 'unknown',

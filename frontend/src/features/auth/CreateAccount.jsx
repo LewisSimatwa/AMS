@@ -88,13 +88,13 @@ export default function CreateAccount() {
           <div className="logo-wrapper">
             <div className="logo-glow"></div>
             <div className="logo-container">
-              <img src="frontend\public\miams_logo.svg" alt="MIAMS Logo" className="logo-image" />
+              <img src="frontend\public\amslogo.png" alt="MIAMS Logo" className="logo-image" />
             </div>
           </div>
           <div className="brand-text">
-            <h2 className="brand-title">MIAMS</h2>
+            <h2 className="brand-title">AMS</h2>
             <p className="brand-subtitle">
-              Multi-institutional Asset Management System
+              Asset Management System
             </p>
           </div>
         </div>

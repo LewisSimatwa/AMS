@@ -79,6 +79,31 @@ export default function AssetTable({ onView, onRetire, refreshTrigger }) {
     return url;
   };
 
+  const handleDownloadBarcode = async (asset) => {
+    try {
+      const response = await fetch(getBarcodeUrl(asset), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!response.ok) throw new Error("Failed to fetch barcode");
+
+      const svgText = await response.text();
+      const blob = new Blob([svgText], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `barcode_${asset.asset_code}.svg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Download failed:", err);
+      alert("Failed to download barcode. Please try again.");
+    }
+  };
+
   // Filter assets based on status and search term
   const filteredAssets = assets.filter((asset) => {
     const matchesFilter = 
@@ -298,13 +323,12 @@ export default function AssetTable({ onView, onRetire, refreshTrigger }) {
                 />
               </div>
               <div className="barcode-actions">
-                <a
-                  href={getBarcodeUrl(selectedAsset)}
-                  download={`barcode_${selectedAsset.asset_code}.svg`}
+                <button
+                  onClick={() => handleDownloadBarcode(selectedAsset)}
                   className="btn-download"
                 >
                   Download Barcode
-                </a>
+                </button>
               </div>
             </div>
           </div>

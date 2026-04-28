@@ -304,7 +304,6 @@ export default function Analytics() {
       <div className="analytics-header">
         <div>
           <h1>Predictive Analytics Dashboard</h1>
-          <p>AI-powered insights and asset risk analysis</p>
         </div>
         <div className="header-actions">
           <button 

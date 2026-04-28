@@ -289,6 +289,25 @@
   display: none;
 }
 
+.nav-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08); /* adjust to your sidebar's color */
+}
+ 
+/* "Administration" label */
+.nav-section-label {
+  display: block;
+  padding: 4px 16px 6px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
+}
+
 @media (max-width: 768px) {
   .sidebar {
     width: 280px;

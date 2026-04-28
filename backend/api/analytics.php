@@ -2,12 +2,8 @@
 // Include CORS handler FIRST
 require __DIR__ . '/cors.php';
 
-/**
- * MIAMS - Analytics API Handler
- * Handles analytics endpoints and connects to Python analytics microservice
- * 
- * This file is called from index.php via handleAnalytics($db, $method, $path, $currentUser)
- */
+// Handles analytics endpoints and connects to Python analytics microservice)
+
 
 // Configuration for Analytics Service
 if (!defined('ANALYTICS_SERVICE_URL')) {
