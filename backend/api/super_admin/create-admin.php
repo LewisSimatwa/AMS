@@ -1,5 +1,4 @@
 <?php
-// api/super_admin/create-admin.php
 error_log("=== CREATE-ADMIN.PHP CALLED ===");
 
 // No need to require files or verify auth - already done in index.php

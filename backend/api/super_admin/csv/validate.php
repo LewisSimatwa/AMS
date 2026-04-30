@@ -1,6 +1,4 @@
 <?php
-// api/super_admin/csv/validate.php
-
 require __DIR__ . '/../../cors.php';
 require __DIR__ . '/../../config.php';
 require __DIR__ . '/../../helpers.php';

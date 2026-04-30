@@ -1,10 +1,5 @@
 <?php
-// api/super_admin/institution-admins.php
-// Note: Auth verification is already done in index.php before this file is included
 error_log("=== INSTITUTION-ADMINS.PHP CALLED ===");
-
-// No need to require files or verify auth - already done in index.php
-// The $db connection is available from index.php via config.php
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     respond(['error' => 'Method not allowed'], 405);

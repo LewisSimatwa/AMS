@@ -1,8 +1,5 @@
 <?php
-/**
- * Handles analytics endpoints and connects to Python analytics microservice
- */
-
+// Handles analytics endpoints and connects to Python analytics microservice
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/cors.php';

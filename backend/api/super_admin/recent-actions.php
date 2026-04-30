@@ -1,5 +1,4 @@
 <?php
-// api/super-admin/recent-actions.php
 error_log("=== RECENT-ACTIONS.PHP CALLED ===");
 
 require __DIR__ . '/../cors.php';

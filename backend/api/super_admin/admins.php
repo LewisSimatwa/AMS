@@ -1,5 +1,4 @@
 <?php
-// api/super_admin/admins.php
 error_log("=== ADMINS ENDPOINT CALLED ===");
 
 require __DIR__ . '/../cors.php';

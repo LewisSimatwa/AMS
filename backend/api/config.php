@@ -6,7 +6,6 @@ ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/error.log');
 
 try {
-    // Load .env
     $envFile = __DIR__ . '/.env';
     
     if (!file_exists($envFile)) {

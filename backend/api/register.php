@@ -1,5 +1,4 @@
 <?php
-// Include CORS handler FIRST
 require __DIR__ . '/cors.php';
 
 // Enable error logging

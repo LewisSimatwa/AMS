@@ -1,5 +1,4 @@
 <?php
-
 function handleReports($db, $method, $path) {
     header('Content-Type: application/json');
 

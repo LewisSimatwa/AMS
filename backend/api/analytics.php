@@ -1,5 +1,4 @@
 <?php
-// Include CORS handler FIRST
 require __DIR__ . '/cors.php';
 
 // Handles analytics endpoints and connects to Python analytics microservice)

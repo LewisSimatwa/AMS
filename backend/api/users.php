@@ -1,11 +1,4 @@
 <?php
-/**
- * MIAMS User Management API
- * Handles CRUD operations for users (Admin only)
- */
-// NO WHITESPACE BEFORE THIS LINE!
-
-// Include CORS handler FIRST
 require __DIR__ . '/cors.php';
 
 // Disable display errors
@@ -18,9 +11,8 @@ ini_set('error_log', __DIR__ . '/error.log');
 require __DIR__ . '/config.php';
 require __DIR__ . '/helpers.php';
 
-/**
- * Verify JWT token and check admin role
- */
+
+//Verify JWT token and check admin role
 function verifyAdminToken($db) {
     // Get authorization header using helper function
     $authHeader = getAuthorizationHeader();
@@ -74,9 +66,8 @@ function verifyAdminToken($db) {
     return $user;
 }
 
-/**
- * Log audit trail
- */
+
+//Log audit trail
 function logAuditTrail($db, $institutionId, $userId, $entityType, $entityId, $action, $oldValues = null, $newValues = null) {
     try {
         $stmt = $db->prepare("
@@ -568,7 +559,7 @@ try {
     respond([
         'success' => false, 
         'message' => 'Database error occurred',
-        'error' => $e->getMessage(), // Include error in response for debugging
+        'error' => $e->getMessage(),
         'code' => $e->getCode()
     ], 500);
 } catch (Exception $e) {
@@ -580,7 +571,7 @@ try {
     respond([
         'success' => false, 
         'message' => 'Server error occurred',
-        'error' => $e->getMessage() // Include error in response for debugging
+        'error' => $e->getMessage() 
     ], 500);
 }
 ?>

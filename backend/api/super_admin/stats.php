@@ -1,5 +1,4 @@
 <?php
-// api/super-admin/stats.php
 error_log("=== STATS.PHP CALLED ===");
 
 require __DIR__ . '/../cors.php';

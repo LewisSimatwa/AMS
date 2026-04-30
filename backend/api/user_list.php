@@ -1,12 +1,5 @@
 <?php
-/**
- * MIAMS User List API
- * Provides a simple list of active users for checkout purposes
- * Accessible by all authenticated users
- */
-// NO WHITESPACE BEFORE THIS LINE!
-
-// Include CORS handler FIRST
+ //Provides a simple list of active users for checkout purposes
 require __DIR__ . '/cors.php';
 
 // Disable display errors

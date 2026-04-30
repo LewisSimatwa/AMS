@@ -70,11 +70,6 @@ try {
         // ----------------------------------------
         if ($path === '/available' && $method === 'GET') {
             require __DIR__ . '/available.php';
-        } elseif ($path === '/delete_asset.php' && $method === 'POST') {
-            require __DIR__ . '/delete_asset.php';
-        } elseif (preg_match('#^/assets/(\d+)$#', $path, $matches) && $method === 'DELETE') {
-            $_GET['id'] = $matches[1];
-            require __DIR__ . '/delete_asset.php';
         } elseif (strpos($path, '/assets') === 0) {
             require 'assets.php';
             handleAssets($db, $method, $path);
@@ -243,15 +238,15 @@ try {
             }
             
             // ASSET MANAGEMENT ROUTES
-            elseif ($path === '/super_admin/assets' && $method === 'GET') {
-                require __DIR__ . '/super_admin/assets.php';
-            } 
-            elseif ($path === '/super_admin/force-retire' && $method === 'POST') {
-                require __DIR__ . '/super_admin/force-retire.php';
-            } 
-            elseif ($path === '/super_admin/asset-history' && $method === 'GET') {
-                require __DIR__ . '/super_admin/asset-history.php';
-            } 
+            // elseif ($path === '/super_admin/assets' && $method === 'GET') {
+            //     require __DIR__ . '/super_admin/assets.php';
+            // } 
+            // elseif ($path === '/super_admin/force-retire' && $method === 'POST') {
+            //     require __DIR__ . '/super_admin/force-retire.php';
+            // } 
+            // elseif ($path === '/super_admin/asset-history' && $method === 'GET') {
+            //     require __DIR__ . '/super_admin/asset-history.php';
+            // } 
             
             // SYSTEM CONFIG
             elseif ($path === '/super_admin/system-config' && in_array($method, ['GET', 'POST'])) {

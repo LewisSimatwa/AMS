@@ -1,5 +1,4 @@
 <?php
-// api/super_admin/system-config.php
 error_log("=== SYSTEM-CONFIG.PHP CALLED ===");
 
 require __DIR__ . '/../cors.php';

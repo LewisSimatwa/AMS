@@ -1,5 +1,4 @@
 <?php
-// api/super-admin/institutions.php
 error_log("=== INSTITUTIONS.PHP CALLED ===");
 
 require __DIR__ . '/../cors.php';
