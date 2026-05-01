@@ -162,7 +162,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="dashboard-container">
-        <div className="loading-spinner">Loading dashboard...</div>
+        <div>Loading dashboard...</div>
       </div>
     );
   }
