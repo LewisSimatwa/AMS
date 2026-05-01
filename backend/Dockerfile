@@ -1,32 +1,37 @@
-FROM php:8.2-apache
+FROM php:8.2-fpm
 
-# Install PostgreSQL extension
-RUN apt-get update && apt-get install -y libpq-dev \
+# Install nginx and PostgreSQL extension
+RUN apt-get update && apt-get install -y \
+    nginx \
+    libpq-dev \
     && docker-php-ext-install pdo pdo_pgsql \
     && rm -rf /var/lib/apt/lists/*
 
-# Fix MPM conflict: directly remove all MPM configs and create only prefork
-RUN rm -f /etc/apache2/mods-enabled/mpm_*.load \
-    /etc/apache2/mods-enabled/mpm_*.conf \
-    && echo "LoadModule mpm_prefork_module /usr/lib/apache2/modules/mod_mpm_prefork.so" \
-    > /etc/apache2/mods-enabled/mpm_prefork.load \
-    && echo "<IfModule mpm_prefork_module>\n\
-    StartServers 5\n\
-    MinSpareServers 5\n\
-    MaxSpareServers 10\n\
-    MaxRequestWorkers 150\n\
-    MaxConnectionsPerChild 0\n\
-    </IfModule>" > /etc/apache2/mods-enabled/mpm_prefork.conf
-
-# Enable mod_rewrite
-RUN a2enmod rewrite
-
-# Allow .htaccess overrides
-RUN sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
+# Configure nginx
+RUN echo 'server { \n\
+    listen 80; \n\
+    root /var/www/html; \n\
+    index index.php index.html; \n\
+    \n\
+    location / { \n\
+    try_files $uri $uri/ /index.php?$query_string; \n\
+    } \n\
+    \n\
+    location ~ \.php$ { \n\
+    fastcgi_pass 127.0.0.1:9000; \n\
+    fastcgi_index index.php; \n\
+    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name; \n\
+    include fastcgi_params; \n\
+    } \n\
+    }' > /etc/nginx/sites-available/default
 
 # Copy PHP code
 COPY . /var/www/html/
-
 RUN chown -R www-data:www-data /var/www/html
 
+# Startup script: run both php-fpm and nginx
+RUN echo '#!/bin/sh\nphp-fpm -D\nnginx -g "daemon off;"' > /start.sh \
+    && chmod +x /start.sh
+
 EXPOSE 80
+CMD ["/start.sh"]
